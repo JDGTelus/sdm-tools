@@ -28,22 +28,44 @@ def print_banner():
     console.print("[bold blue]Customized insights and actions for SDMs.[/bold blue]")
 
 
-def fetch_jira_issues():
-    """ Fetches Jira issues assigned to the configured user. """
-    url = f"{JIRA_URL}/rest/api/3/search"
-    headers = {"Accept": "application/json"}
-    jql_query = f'component="IOTMI 3P Connector" AND issuetype IN ({",".join(ISSUE_TYPES)})'
-    params = {'jql': jql_query, 'maxResults': 1000}
+def fetch_issue_ids():
+    """ Fetches issue IDs from Jira using JQL. """
+    url = f"{JIRA_URL}/rest/api/3/search/jql"
+    headers = {"Accept": "application/json", "Content-Type": "application/json"}
+    jql_query = f'assignee="{USER_EMAIL}" AND issuetype IN ({",".join(ISSUE_TYPES)})'
+    data = {'jql': jql_query, 'maxResults': 50}
 
-    response = requests.get(
+    response = requests.post(
         url,
         headers=headers,
         auth=HTTPBasicAuth(USER_EMAIL, API_TOKEN),
-        params=params
+        json=data
     )
 
     if response.status_code != 200:
-        raise Exception(f"Failed to fetch issues: {response.status_code} - {response.text}")
+        raise Exception(f"Failed to fetch issue IDs: {response.status_code} - {response.text}")
+
+    return [issue['id'] for issue in response.json().get('issues', [])]
+
+
+def fetch_issue_details(issue_ids):
+    """ Fetches detailed issue data for given issue IDs. """
+    url = f"{JIRA_URL}/rest/api/3/issue/bulkfetch"
+    headers = {"Accept": "application/json", "Content-Type": "application/json"}
+    data = {
+        'issueIdsOrKeys': issue_ids,
+        'fields': ['key', 'summary', 'status', 'assignee', 'created', 'updated']
+    }
+
+    response = requests.post(
+        url,
+        headers=headers,
+        auth=HTTPBasicAuth(USER_EMAIL, API_TOKEN),
+        json=data
+    )
+
+    if response.status_code != 200:
+        raise Exception(f"Failed to fetch issue details: {response.status_code} - {response.text}")
 
     return response.json().get('issues', [])
 
@@ -135,7 +157,8 @@ def manage_issues():
 
     if choice == '1':
         backup_database()
-        issues = fetch_jira_issues()
+        issue_ids = fetch_issue_ids()
+        issues = fetch_issue_details(issue_ids)
         store_issues_in_db(issues)
         console.print("[bold green]Issues updated from Jira and stored in the database.[/bold green]")
         display_issues()
