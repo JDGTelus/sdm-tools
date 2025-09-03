@@ -9,6 +9,7 @@ SDM-Tools is a command-line interface (CLI) tool designed for Software Delivery 
 - Monitor current work and provide detailed views of tasks.
 - Store and display Jira issues with customizable columns.
 - Backup and update Jira data with ease.
+- Write raw payloads to a file for inspection.
 
 ## Setup
 
@@ -57,9 +58,10 @@ Set the following environment variables for configuration:
 - `JIRA_URL`: Base URL for Jira API (e.g., `https://your-jira-domain.atlassian.net`)
 - `JIRA_API_TOKEN`: API token for authentication
 - `JIRA_EMAIL`: Email associated with the Jira account
-- `COMPONENT_NAME`: Name of the component to filter issues by (optional, not used in the current script)
-- `ISSUE_TYPES`: Comma-separated list of issue types to consider (e.g., `Epic,Story,Bug`)
-- `DISPLAY_COLUMNS`: Comma-separated list of columns to display (e.g., `key,summary,status`)
+- `JQL_QUERY`: JQL query to filter issues (e.g., `project = "SET" AND component = "IOTMI 3P Connector"`)
+- `DISPLAY_COLUMNS`: Comma-separated list of columns to display (e.g., `key,summary,assignee,status`)
+- `DB_NAME`: Name of the SQLite database file (e.g., `jira_issues.db`)
+- `TABLE_NAME`: Name of the table to store issues (e.g., `iotmi_3p_issues`)
 
 Example of recommended `.env` to load:
 
@@ -68,13 +70,15 @@ Example of recommended `.env` to load:
 export JIRA_URL='https://your-jira-domain.atlassian.net'
 export JIRA_API_TOKEN='your-api-token'
 export JIRA_EMAIL='your-email@example.com'
-export ISSUE_TYPES='Epic,Story,Bug'
-export DISPLAY_COLUMNS='key,summary,status'
+export JQL_QUERY='project = "SET" AND component = "IOTMI 3P Connector"'
+export DISPLAY_COLUMNS='key,summary,assignee,status'
+export DB_NAME='jira_issues.db'
+export TABLE_NAME='iotmi_3p_issues'
 ```
 
 ## Usage
 
-Load env vars, and run the CLI tool:
+Load environment variables and run the CLI tool:
 
 ```bash
 set -a; source .env; set +a
@@ -82,3 +86,12 @@ python sdm_tools.py
 ```
 
 Follow the on-screen menu to manage and display Jira issues.
+
+## License
+
+This project is licensed under the MIT License.
+
+### Notes
+
+- **User-Friendly Output**: The script now stores meaningful data, and the `DISPLAY_COLUMNS` environment variable is set to display relevant fields. Adjust the `DISPLAY_COLUMNS` as needed to improve the user experience.
+- **Raw Payload**: The raw payload is written to a file (`jira_raw_payload.json`) for inspection, which can help in understanding the structure and available fields.
