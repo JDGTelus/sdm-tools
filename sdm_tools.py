@@ -9,6 +9,7 @@ from rich.console import Console
 from rich.table import Table
 from pyfiglet import Figlet
 import json
+import subprocess
 
 
 console = Console()
@@ -17,9 +18,9 @@ console = Console()
 JIRA_URL = os.getenv('JIRA_URL')
 JIRA_API_TOKEN = os.getenv('JIRA_API_TOKEN')
 JIRA_EMAIL = os.getenv('JIRA_EMAIL')
-JQL_QUERY = os.getenv('JQL_QUERY', 'assignee="{USER_EMAIL}" AND issuetype IN (Story,Bug)')
+JQL_QUERY = os.getenv('JQL_QUERY', 'project = "SET" AND component = "IOTMI 3P Connector"')
 DISPLAY_COLUMNS = os.getenv('DISPLAY_COLUMNS', 'key,summary,assignee,status').split(',')
-DB_NAME = os.getenv('DB_NAME', 'sdm_tools_jira_issues.db')
+DB_NAME = os.getenv('DB_NAME', 'jira_issues.db')
 TABLE_NAME = os.getenv('TABLE_NAME', 'iotmi_3p_issues')
 RAW_DATA_FILE = 'jira_raw_payload.json'
 
@@ -30,6 +31,11 @@ def print_banner():
     ascii_art = f.renderText('SDM-Tools')
     console.print(f"[bold green]{ascii_art}[/bold green]")
     console.print("[bold blue]Customized insights and actions for SDMs.[/bold blue]")
+
+
+def clear_screen():
+    """ Clears the terminal screen. """
+    subprocess.run('clear', shell=True)
 
 
 def fetch_issue_ids():
@@ -150,7 +156,11 @@ def display_issues():
     for row in rows:
         table.add_row(*[str(item) for item in row])
 
-    console.print(table)
+    # Capture the table output and pipe it to less
+    with console.capture() as capture:
+        console.print(table)
+    subprocess.run(['less'], input=capture.get().encode('utf-8'))
+
     conn.close()
 
 
@@ -158,42 +168,43 @@ def display_issues():
 @click.pass_context
 def cli(ctx):
     """SDM Tools: Manage your team's Jira tasks with style!"""
-    print_banner()
-    if ctx.invoked_subcommand is None:
-        manage_issues()
+    manage_issues()
 
 
 @cli.command()
 def manage_issues():
     """Manage Jira issues."""
-    console.print("[bold yellow]Choose an option:[/bold yellow]")
-    console.print("[bold cyan]1. Update and display issues from Jira[/bold cyan]")
-    console.print("[bold cyan]2. Display issues from stored data[/bold cyan]")
-    console.print("[bold cyan]3. Exit[/bold cyan]")
+    while True:
+        clear_screen()
+        print_banner()
+        console.print("[bold yellow]Choose an option:[/bold yellow]")
+        console.print("[bold cyan]1. Update and display issues from Jira[/bold cyan]")
+        console.print("[bold cyan]2. Display issues from stored data[/bold cyan]")
+        console.print("[bold cyan]3. Exit[/bold cyan]")
 
-    choice = console.input("[bold magenta]Enter your choice (1/2/3): [/bold magenta]")
+        choice = console.input("[bold magenta]Enter your choice (1/2/3): [/bold magenta]")
 
-    if choice == '1':
-        issue_ids = fetch_issue_ids()
-        issues = fetch_issue_details(issue_ids)
-        if issues:
-            conn = sqlite3.connect(DB_NAME)
-            cursor = conn.cursor()
-            cursor.execute(f"SELECT name FROM sqlite_master WHERE type='table' AND name='{TABLE_NAME}'")
-            if cursor.fetchone():
-                backup_table(conn)
-            conn.close()
-            store_issues_in_db(issues)
-            console.print("[bold green]Issues updated from Jira and stored in the database.[/bold green]")
+        if choice == '1':
+            issue_ids = fetch_issue_ids()
+            issues = fetch_issue_details(issue_ids)
+            if issues:
+                conn = sqlite3.connect(DB_NAME)
+                cursor = conn.cursor()
+                cursor.execute(f"SELECT name FROM sqlite_master WHERE type='table' AND name='{TABLE_NAME}'")
+                if cursor.fetchone():
+                    backup_table(conn)
+                conn.close()
+                store_issues_in_db(issues)
+                console.print("[bold green]Issues updated from Jira and stored in the database.[/bold green]")
+                display_issues()
+        elif choice == '2':
             display_issues()
-    elif choice == '2':
-        display_issues()
-    elif choice == '3':
-        console.print("[bold red]Exiting SDM Tools.[/bold red]")
-    else:
-        console.print("[bold red]Invalid choice. Please try again.[/bold red]")
+        elif choice == '3':
+            console.print("[bold red]Exiting SDM Tools.[/bold red]")
+            break
+        else:
+            console.print("[bold red]Invalid choice. Please try again.[/bold red]")
 
 
 if __name__ == "__main__":
     cli()
-
