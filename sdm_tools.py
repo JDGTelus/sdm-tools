@@ -23,6 +23,7 @@ DISPLAY_COLUMNS = os.getenv('DISPLAY_COLUMNS', 'key,summary,assignee,status').sp
 DB_NAME = os.getenv('DB_NAME', 'jira_issues.db')
 TABLE_NAME = os.getenv('TABLE_NAME', 'iotmi_3p_issues')
 RAW_DATA_FILE = 'jira_raw_payload.json'
+REPO_PATH = os.getenv('REPO_PATH')
 
 
 def print_banner():
@@ -169,6 +170,28 @@ def display_issues():
     conn.close()
 
 
+def display_last_commit():
+    """ Displays the last commit from the repository specified in REPO_PATH. """
+    if not REPO_PATH or not os.path.exists(REPO_PATH):
+        console.print("[bold red]Repository path is not set or does not exist. Please check the REPO_PATH environment variable.[/bold red]")
+        input("Press Enter to return to the menu...")
+        return
+
+    os.chdir(REPO_PATH)
+    try:
+        last_commit = subprocess.check_output(['git', 'log', '-1', '--pretty=format:%H|%an|%ae|%ad|%s']).decode('utf-8')
+        commit_hash, author_name, author_email, date, message = last_commit.split('|', 4)
+        console.print(f"[bold green]Last Commit:[/bold green]")
+        console.print(f"[bold cyan]Hash:[/bold cyan] {commit_hash}")
+        console.print(f"[bold cyan]Author:[/bold cyan] {author_name} <{author_email}>")
+        console.print(f"[bold cyan]Date:[/bold cyan] {date}")
+        console.print(f"[bold cyan]Message:[/bold cyan] {message}")
+    except subprocess.CalledProcessError as e:
+        console.print(f"[bold red]Failed to fetch the last commit: {e}[/bold red]")
+
+    input("Press Enter to return to the menu...")
+
+
 @click.group(invoke_without_command=True)
 @click.pass_context
 def cli(ctx):
@@ -185,9 +208,10 @@ def manage_issues():
         console.print("[bold yellow]Choose an option:[/bold yellow]")
         console.print("[bold cyan]1. Update and display issues from Jira[/bold cyan]")
         console.print("[bold cyan]2. Display issues from stored data[/bold cyan]")
-        console.print("[bold cyan]3. Exit[/bold cyan]")
+        console.print("[bold cyan]3. Display last commit from repository[/bold cyan]")
+        console.print("[bold cyan]4. Exit[/bold cyan]")
 
-        choice = console.input("[bold magenta]Enter your choice (1/2/3): [/bold magenta]")
+        choice = console.input("[bold magenta]Enter your choice (1/2/3/4): [/bold magenta]")
 
         if choice == '1':
             issue_ids = fetch_issue_ids()
@@ -205,6 +229,8 @@ def manage_issues():
         elif choice == '2':
             display_issues()
         elif choice == '3':
+            display_last_commit()
+        elif choice == '4':
             console.print("[bold red]Exiting SDM Tools.[/bold red]")
             break
         else:
