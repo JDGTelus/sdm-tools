@@ -342,9 +342,31 @@ def manage_issues():
                 console.print("[bold green]Issues updated from Jira and stored in the database.[/bold green]")
                 display_issues()
         elif choice == '2':
-            display_issues()
+            if os.path.exists(DB_NAME):
+                conn = sqlite3.connect(DB_NAME)
+                cursor = conn.cursor()
+                cursor.execute(f"SELECT name FROM sqlite_master WHERE type='table' AND name='{TABLE_NAME}'")
+                if cursor.fetchone():
+                    display_issues()
+                else:
+                    console.print("[bold red]No issues data found in the database. Please run option 1 to update issues from Jira first.[/bold red]")
+                    input("Press Enter to return to the menu...")
+            else:
+                console.print("[bold red]Database does not exist. Please run option 1 to update issues from Jira first.[/bold red]")
+                input("Press Enter to return to the menu...")
         elif choice == '3':
-            update_git_commits()
+            if os.path.exists(DB_NAME):
+                conn = sqlite3.connect(DB_NAME)
+                cursor = conn.cursor()
+                cursor.execute(f"SELECT name FROM sqlite_master WHERE type='table' AND name='{TABLE_NAME}'")
+                if cursor.fetchone():
+                    update_git_commits()
+                else:
+                    console.print("[bold red]No Jira issues found in the database. Please run option 1 to update issues from Jira first.[/bold red]")
+                    input("Press Enter to return to the menu...")
+            else:
+                console.print("[bold red]Database does not exist. Please run option 1 to update issues from Jira first.[/bold red]")
+                input("Press Enter to return to the menu...")
         elif choice == '4':
             display_commits()
         elif choice == '5':
@@ -352,6 +374,7 @@ def manage_issues():
             break
         else:
             console.print("[bold red]Invalid choice. Please try again.[/bold red]")
+            input("Press Enter to return to the menu...")
 
 
 if __name__ == "__main__":
