@@ -1,6 +1,6 @@
 # SDM-Tools
 
-SDM-Tools is a command-line interface (CLI) tool designed for Software Delivery Managers (SDMs) to manage and analyze their team's Jira tasks. The tool provides customized insights and actions, making it easier to track and manage issues, backlog, and sprint planning.
+SDM-Tools is a command-line interface (CLI) tool designed for Software Development Managers (SDMs) to manage and analyze their team's Jira tasks and repository commits. The tool provides customized insights and actions, making it easier to track and manage issues, backlog, sprint planning, and commit history.
 
 ## Features
 
@@ -10,6 +10,8 @@ SDM-Tools is a command-line interface (CLI) tool designed for Software Delivery 
 - Store and display Jira issues with customizable columns.
 - Backup and update Jira data with ease.
 - Write raw payloads to a file for inspection.
+- Fetch and store commit information from the repository.
+- Display commit information with pagination and colorful output.
 
 ## Setup
 
@@ -17,6 +19,7 @@ SDM-Tools is a command-line interface (CLI) tool designed for Software Delivery 
 
 - Python 3.6 or higher
 - Jira account with API access
+- Local repository with commit history
 
 ### Jira API Token
 
@@ -62,6 +65,7 @@ Set the following environment variables for configuration:
 - `DISPLAY_COLUMNS`: Comma-separated list of columns to display (e.g., `key,summary,assignee,status`)
 - `DB_NAME`: Name of the SQLite database file (e.g., `jira_issues.db`)
 - `TABLE_NAME`: Name of the table to store issues (e.g., `iotmi_3p_issues`)
+- `REPO_PATH`: Path to the local repository (e.g., `/path/to/repo`)
 
 Example of recommended `.env` to load:
 
@@ -74,6 +78,7 @@ export JQL_QUERY='project = "SET" AND component = "IOTMI 3P Connector"'
 export DISPLAY_COLUMNS='key,summary,assignee,status'
 export DB_NAME='jira_issues.db'
 export TABLE_NAME='iotmi_3p_issues'
+export REPO_PATH='/path/to/repo'
 ```
 
 ## Usage
@@ -85,7 +90,7 @@ set -a; source .env; set +a
 python sdm_tools.py
 ```
 
-Follow the on-screen menu to manage and display Jira issues.
+Follow the on-screen menu to manage and display Jira issues and commit information.
 
 ## License
 
@@ -94,4 +99,4 @@ This project is licensed under the MIT License.
 ### Notes
 
 - **User-Friendly Output**: The script now stores meaningful data, and the `DISPLAY_COLUMNS` environment variable is set to display relevant fields. Adjust the `DISPLAY_COLUMNS` as needed to improve the user experience.
-- **Raw Payload**: The raw payload is written to a file (`jira_raw_payload.json`) for inspection, which can help in understanding the structure and available fields.
+- **Commit Information**: The script fetches commit information from the repository and stores it in the `git_commits` table in the SQLite database. You can update and display commit information using the CLI tool.

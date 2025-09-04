@@ -8,7 +8,6 @@ from requests.auth import HTTPBasicAuth
 from rich.console import Console
 from rich.table import Table
 from pyfiglet import Figlet
-import json
 import subprocess
 
 
@@ -20,9 +19,8 @@ JIRA_API_TOKEN = os.getenv('JIRA_API_TOKEN')
 JIRA_EMAIL = os.getenv('JIRA_EMAIL')
 JQL_QUERY = os.getenv('JQL_QUERY', 'project = "SET" AND component = "IOTMI 3P Connector"')
 DISPLAY_COLUMNS = os.getenv('DISPLAY_COLUMNS', 'key,summary,assignee,status').split(',')
-DB_NAME = os.getenv('DB_NAME', 'jira_issues.db')
+DB_NAME = os.getenv('DB_NAME', 'sdm_tools.db')
 TABLE_NAME = os.getenv('TABLE_NAME', 'iotmi_3p_issues')
-RAW_DATA_FILE = 'jira_raw_payload.json'
 REPO_PATH = os.getenv('REPO_PATH')
 
 
@@ -76,10 +74,6 @@ def fetch_issue_details(issue_ids):
 
     if response.status_code != 200:
         raise Exception(f"Failed to fetch issue details: {response.status_code} - {response.text}")
-
-    # Write raw payload to file
-    with open(RAW_DATA_FILE, 'w') as f:
-        json.dump(response.json(), f, indent=4)
 
     return response.json().get('issues', [])
 
@@ -273,11 +267,16 @@ def update_git_commits():
     store_commits_in_db(commits)
 
     console.print("[bold green]Commits since the earliest Jira ticket date have been stored in the database.[/bold green]")
-    input("Press Enter to return to the menu...")
+    display_commits()
 
 
 def display_commits():
     """ Displays commit information from the git_commits table. """
+    if not os.path.exists(DB_NAME):
+        console.print("[bold red]Database does not exist. Please update commits first.[/bold red]")
+        input("Press Enter to return to the menu...")
+        return
+
     conn = sqlite3.connect(DB_NAME)
     cursor = conn.cursor()
 
@@ -299,9 +298,12 @@ def display_commits():
     for row in rows:
         table.add_row(*[str(item) for item in row])
 
-    console.print(table)
+    # Capture the table output and pipe it to less
+    with console.capture() as capture:
+        console.print(table)
+    subprocess.run(['less'], input=capture.get().encode('utf-8'))
+
     conn.close()
-    input("Press Enter to return to the menu...")
 
 
 @click.group(invoke_without_command=True)
