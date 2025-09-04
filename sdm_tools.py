@@ -84,11 +84,11 @@ def fetch_issue_details(issue_ids):
     return response.json().get('issues', [])
 
 
-def backup_table(conn):
+def backup_table(conn, table_name):
     """ Backs up the current table by renaming it with a timestamp. """
     cursor = conn.cursor()
-    backup_table_name = f"{TABLE_NAME}_backup_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
-    cursor.execute(f"ALTER TABLE {TABLE_NAME} RENAME TO {backup_table_name}")
+    backup_table_name = f"{table_name}_backup_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+    cursor.execute(f"ALTER TABLE {table_name} RENAME TO {backup_table_name}")
     console.print(f"[bold yellow]Table backed up to {backup_table_name}[/bold yellow]")
 
 
@@ -114,7 +114,7 @@ def store_issues_in_db(issues):
     # Check if the table exists
     cursor.execute(f"SELECT name FROM sqlite_master WHERE type='table' AND name='{TABLE_NAME}'")
     if cursor.fetchone():
-        backup_table(conn)
+        backup_table(conn, TABLE_NAME)
         create_table_from_issues(conn, issues)
     else:
         create_table_from_issues(conn, issues)
@@ -170,25 +170,75 @@ def display_issues():
     conn.close()
 
 
-def display_last_commit():
-    """ Displays the last commit from the repository specified in REPO_PATH. """
+def fetch_earliest_ticket_date():
+    """ Fetches the creation date of the earliest Jira ticket from the database. """
+    conn = sqlite3.connect(DB_NAME)
+    cursor = conn.cursor()
+
+    cursor.execute(f"SELECT MIN(created) FROM {TABLE_NAME}")
+    earliest_date = cursor.fetchone()[0]
+
+    conn.close()
+
+    # Convert date to YYYY-MM-DD format
+    if earliest_date:
+        parsed_date = datetime.strptime(earliest_date, "%Y-%m-%dT%H:%M:%S.%f%z")
+        formatted_date = parsed_date.strftime("%Y-%m-%d")
+        return formatted_date
+    return None
+
+
+def fetch_git_commits_since(date):
+    """ Fetches commit information from the Git repository starting from the given date. """
     if not REPO_PATH or not os.path.exists(REPO_PATH):
         console.print("[bold red]Repository path is not set or does not exist. Please check the REPO_PATH environment variable.[/bold red]")
         input("Press Enter to return to the menu...")
-        return
+        return []
 
     os.chdir(REPO_PATH)
     try:
-        last_commit = subprocess.check_output(['git', 'log', '-1', '--pretty=format:%H|%an|%ae|%ad|%s']).decode('utf-8')
-        commit_hash, author_name, author_email, date, message = last_commit.split('|', 4)
-        console.print(f"[bold green]Last Commit:[/bold green]")
-        console.print(f"[bold cyan]Hash:[/bold cyan] {commit_hash}")
-        console.print(f"[bold cyan]Author:[/bold cyan] {author_name} <{author_email}>")
-        console.print(f"[bold cyan]Date:[/bold cyan] {date}")
-        console.print(f"[bold cyan]Message:[/bold cyan] {message}")
+        commits = subprocess.check_output(['git', 'log', f'--since={date}', '--pretty=format:%H|%an|%ae|%ad|%s']).decode('utf-8').split('\n')
+        return commits
     except subprocess.CalledProcessError as e:
-        console.print(f"[bold red]Failed to fetch the last commit: {e}[/bold red]")
+        console.print(f"[bold red]Failed to fetch commits: {e}[/bold red]")
+        input("Press Enter to return to the menu...")
+        return []
 
+
+def output_commits_to_file(commits):
+    """ Outputs commit information to a plain text file in the project root. """
+    if not commits:
+        console.print("[bold red]No commits to write to file.[/bold red]")
+        return
+
+    # Specify the project root path for the output file
+    project_root_path = os.path.dirname(os.path.abspath(__file__))
+    file_path = os.path.join(project_root_path, 'commits.txt')
+
+    with open(file_path, 'w') as f:
+        for commit in commits:
+            f.write(commit + '\n')
+
+    console.print(f"[bold green]Commits have been written to {file_path}.[/bold green]")
+
+
+def display_earliest_jira_and_commits():
+    """ Displays the earliest Jira story and writes commits since that date to a file. """
+    earliest_date = fetch_earliest_ticket_date()
+    if not earliest_date:
+        console.print("[bold red]No Jira issues found in the database.[/bold red]")
+        input("Press Enter to return to the menu...")
+        return
+
+    console.print(f"[bold green]Earliest Jira ticket creation date: {earliest_date}[/bold green]")
+
+    commits = fetch_git_commits_since(earliest_date)
+    if not commits:
+        console.print("[bold red]No commits found since the earliest Jira ticket date.[/bold red]")
+        input("Press Enter to return to the menu...")
+        return
+
+    output_commits_to_file(commits)
     input("Press Enter to return to the menu...")
 
 
@@ -208,7 +258,7 @@ def manage_issues():
         console.print("[bold yellow]Choose an option:[/bold yellow]")
         console.print("[bold cyan]1. Update and display issues from Jira[/bold cyan]")
         console.print("[bold cyan]2. Display issues from stored data[/bold cyan]")
-        console.print("[bold cyan]3. Display last commit from repository[/bold cyan]")
+        console.print("[bold cyan]3. Display earliest Jira story and write commits since that date to a file[/bold cyan]")
         console.print("[bold cyan]4. Exit[/bold cyan]")
 
         choice = console.input("[bold magenta]Enter your choice (1/2/3/4): [/bold magenta]")
@@ -221,7 +271,7 @@ def manage_issues():
                 cursor = conn.cursor()
                 cursor.execute(f"SELECT name FROM sqlite_master WHERE type='table' AND name='{TABLE_NAME}'")
                 if cursor.fetchone():
-                    backup_table(conn)
+                    backup_table(conn, TABLE_NAME)
                 conn.close()
                 store_issues_in_db(issues)
                 console.print("[bold green]Issues updated from Jira and stored in the database.[/bold green]")
@@ -229,7 +279,7 @@ def manage_issues():
         elif choice == '2':
             display_issues()
         elif choice == '3':
-            display_last_commit()
+            display_earliest_jira_and_commits()
         elif choice == '4':
             console.print("[bold red]Exiting SDM Tools.[/bold red]")
             break

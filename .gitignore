@@ -50,3 +50,6 @@ build/
 
 # raw json
 *_raw_*.json
+
+# temp txt output
+*.txt
