@@ -132,6 +132,11 @@ def store_issues_in_db(issues):
 
 def display_issues():
     """ Displays issues in a table format. """
+    if not os.path.exists(DB_NAME):
+        console.print("[bold red]Database does not exist. Please update issues from Jira first.[/bold red]")
+        input("Press Enter to return to the menu...")
+        return
+
     conn = sqlite3.connect(DB_NAME)
     cursor = conn.cursor()
 

@@ -47,3 +47,6 @@ build/
 
 # sqlite3
 *.db
+
+# raw json
+*_raw_*.json
