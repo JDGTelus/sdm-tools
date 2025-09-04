@@ -195,35 +195,66 @@ def fetch_git_commits_since(date):
         input("Press Enter to return to the menu...")
         return []
 
+    # Save the current working directory
+    original_cwd = os.getcwd()
     os.chdir(REPO_PATH)
     try:
         commits = subprocess.check_output(['git', 'log', f'--since={date}', '--pretty=format:%H|%an|%ae|%ad|%s']).decode('utf-8').split('\n')
-        return commits
     except subprocess.CalledProcessError as e:
         console.print(f"[bold red]Failed to fetch commits: {e}[/bold red]")
-        input("Press Enter to return to the menu...")
-        return []
+        commits = []
+    finally:
+        # Return to the original working directory
+        os.chdir(original_cwd)
+
+    return commits
 
 
-def output_commits_to_file(commits):
-    """ Outputs commit information to a plain text file in the project root. """
-    if not commits:
-        console.print("[bold red]No commits to write to file.[/bold red]")
-        return
-
-    # Specify the project root path for the output file
-    project_root_path = os.path.dirname(os.path.abspath(__file__))
-    file_path = os.path.join(project_root_path, 'commits.txt')
-
-    with open(file_path, 'w') as f:
-        for commit in commits:
-            f.write(commit + '\n')
-
-    console.print(f"[bold green]Commits have been written to {file_path}.[/bold green]")
+def create_git_commits_table(conn):
+    """ Creates the git_commits table if it does not exist. """
+    cursor = conn.cursor()
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS git_commits (
+            hash TEXT PRIMARY KEY,
+            author_name TEXT,
+            author_email TEXT,
+            date TEXT,
+            message TEXT
+        )
+    ''')
 
 
-def display_earliest_jira_and_commits():
-    """ Displays the earliest Jira story and writes commits since that date to a file. """
+def store_commits_in_db(commits):
+    """ Stores commit information in the SQLite3 database. """
+    conn = sqlite3.connect(DB_NAME)
+    cursor = conn.cursor()
+
+    # Backup the table if it exists
+    cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='git_commits'")
+    if cursor.fetchone():
+        backup_table(conn, 'git_commits')
+
+    # Create the table if it doesn't exist
+    create_git_commits_table(conn)
+
+    # Store commits
+    for commit in commits:
+        if commit.strip():
+            try:
+                hash, author_name, author_email, date, message = commit.split('|', 4)
+                cursor.execute('''
+                    INSERT OR REPLACE INTO git_commits (hash, author_name, author_email, date, message)
+                    VALUES (?, ?, ?, ?, ?)
+                ''', (hash, author_name, author_email, date, message))
+            except ValueError:
+                console.print(f"[bold red]Error processing commit: {commit}[/bold red]")
+
+    conn.commit()
+    conn.close()
+
+
+def update_git_commits():
+    """ Updates the git_commits table with commits since the earliest Jira ticket date. """
     earliest_date = fetch_earliest_ticket_date()
     if not earliest_date:
         console.print("[bold red]No Jira issues found in the database.[/bold red]")
@@ -238,7 +269,38 @@ def display_earliest_jira_and_commits():
         input("Press Enter to return to the menu...")
         return
 
-    output_commits_to_file(commits)
+    # Store commits in database
+    store_commits_in_db(commits)
+
+    console.print("[bold green]Commits since the earliest Jira ticket date have been stored in the database.[/bold green]")
+    input("Press Enter to return to the menu...")
+
+
+def display_commits():
+    """ Displays commit information from the git_commits table. """
+    conn = sqlite3.connect(DB_NAME)
+    cursor = conn.cursor()
+
+    # Check if the table exists
+    cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='git_commits'")
+    if not cursor.fetchone():
+        console.print("[bold red]No commit data found in the database. Please update commits first.[/bold red]")
+        input("Press Enter to return to the menu...")
+        return
+
+    cursor.execute("SELECT * FROM git_commits")
+    rows = cursor.fetchall()
+
+    table = Table(show_header=True, header_style="bold magenta")
+    headers = ["Hash", "Author Name", "Author Email", "Date", "Message"]
+    for header in headers:
+        table.add_column(header)
+
+    for row in rows:
+        table.add_row(*[str(item) for item in row])
+
+    console.print(table)
+    conn.close()
     input("Press Enter to return to the menu...")
 
 
@@ -258,10 +320,11 @@ def manage_issues():
         console.print("[bold yellow]Choose an option:[/bold yellow]")
         console.print("[bold cyan]1. Update and display issues from Jira[/bold cyan]")
         console.print("[bold cyan]2. Display issues from stored data[/bold cyan]")
-        console.print("[bold cyan]3. Display earliest Jira story and write commits since that date to a file[/bold cyan]")
-        console.print("[bold cyan]4. Exit[/bold cyan]")
+        console.print("[bold cyan]3. Update commit information from repository[/bold cyan]")
+        console.print("[bold cyan]4. Display commit information from stored data[/bold cyan]")
+        console.print("[bold cyan]5. Exit[/bold cyan]")
 
-        choice = console.input("[bold magenta]Enter your choice (1/2/3/4): [/bold magenta]")
+        choice = console.input("[bold magenta]Enter your choice (1/2/3/4/5): [/bold magenta]")
 
         if choice == '1':
             issue_ids = fetch_issue_ids()
@@ -279,8 +342,10 @@ def manage_issues():
         elif choice == '2':
             display_issues()
         elif choice == '3':
-            display_earliest_jira_and_commits()
+            update_git_commits()
         elif choice == '4':
+            display_commits()
+        elif choice == '5':
             console.print("[bold red]Exiting SDM Tools.[/bold red]")
             break
         else:
