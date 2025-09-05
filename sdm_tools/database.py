@@ -142,8 +142,6 @@ def update_git_commits():
         return
 
     store_commits_in_db(commits)
-    console.print("[bold green]Commits since the earliest Jira ticket date have been stored in the database.[/bold green]")
-    display_commits()
 
 
 def store_commits_in_db(commits):

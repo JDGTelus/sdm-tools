@@ -38,6 +38,8 @@ def manage_issues():
             display_issues()
         elif choice == '3':
             update_git_commits()
+            console.print("[bold green]Commits since the earliest Jira ticket date have been stored in the database.[/bold green]")
+            display_commits()
         elif choice == '4':
             display_commits()
         elif choice == '5':
