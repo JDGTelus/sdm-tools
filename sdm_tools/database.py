@@ -1,39 +1,15 @@
-""" SDM-Tools: Customized insights and actions for SDMs """
-import os
-import click
-import requests
+"""DB handler"""
 import sqlite3
+import os
 from datetime import datetime
-from requests.auth import HTTPBasicAuth
 from rich.console import Console
 from rich.table import Table
-from pyfiglet import Figlet
 import subprocess
+from .config import DB_NAME, TABLE_NAME, DISPLAY_COLUMNS
+from .git import fetch_git_commits_since
+
 
 console = Console()
-
-# Environment variables
-JIRA_URL = os.getenv('JIRA_URL')
-JIRA_API_TOKEN = os.getenv('JIRA_API_TOKEN')
-JIRA_EMAIL = os.getenv('JIRA_EMAIL')
-JQL_QUERY = os.getenv('JQL_QUERY', 'project = "SET" AND component = "IOTMI 3P Connector"')
-DISPLAY_COLUMNS = os.getenv('DISPLAY_COLUMNS', 'key,summary,assignee,status').split(',')
-DB_NAME = os.getenv('DB_NAME', 'sdm_tools.db')
-TABLE_NAME = os.getenv('TABLE_NAME', 'iotmi_3p_issues')
-REPO_PATH = os.getenv('REPO_PATH')
-
-
-def print_banner():
-    """ Prints the ASCII art banner. """
-    f = Figlet(font='slant')
-    ascii_art = f.renderText('SDM-Tools')
-    console.print(f"[bold green]{ascii_art}[/bold green]")
-    console.print("[bold blue]Customized insights and actions for SDMs.[/bold blue]")
-
-
-def clear_screen():
-    """ Clears the terminal screen. """
-    subprocess.run('clear', shell=True)
 
 
 def execute_sql(conn, query, params=()):
@@ -43,44 +19,6 @@ def execute_sql(conn, query, params=()):
     return cursor
 
 
-def fetch_issue_ids():
-    """ Fetches issue IDs from Jira using JQL. """
-    url = f"{JIRA_URL}/rest/api/3/search/jql"
-    headers = {"Accept": "application/json", "Content-Type": "application/json"}
-    params = {'jql': JQL_QUERY, 'maxResults': 50}
-
-    response = requests.post(
-        url,
-        headers=headers,
-        auth=HTTPBasicAuth(JIRA_EMAIL, JIRA_API_TOKEN),
-        json=params
-    )
-
-    if response.status_code != 200:
-        raise Exception(f"Failed to fetch issue IDs: {response.status_code} - {response.text}")
-
-    return [issue['id'] for issue in response.json().get('issues', [])]
-
-
-def fetch_issue_details(issue_ids):
-    """ Fetches detailed issue data for given issue IDs. """
-    url = f"{JIRA_URL}/rest/api/3/issue/bulkfetch"
-    headers = {"Accept": "application/json", "Content-Type": "application/json"}
-    data = {'issueIdsOrKeys': issue_ids, 'fields': ['*all']}
-
-    response = requests.post(
-        url,
-        headers=headers,
-        auth=HTTPBasicAuth(JIRA_EMAIL, JIRA_API_TOKEN),
-        json=data
-    )
-
-    if response.status_code != 200:
-        raise Exception(f"Failed to fetch issue details: {response.status_code} - {response.text}")
-
-    return response.json().get('issues', [])
-
-
 def backup_table(conn, table_name):
     """ Backs up the current table by renaming it with a timestamp. """
     backup_table_name = f"{table_name}_backup_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
@@ -88,11 +26,10 @@ def backup_table(conn, table_name):
     console.print(f"[bold yellow]Table backed up to {backup_table_name}[/bold yellow]")
 
 
-def create_table_from_issues(conn, issues):
-    """ Creates a table with all fields from the Jira API response. """
-    all_fields = {k for issue in issues for k, v in issue['fields'].items() if v is not None}
-    columns = ', '.join(f'{field} TEXT' for field in all_fields)
-    execute_sql(conn, f"CREATE TABLE IF NOT EXISTS {TABLE_NAME} (id TEXT PRIMARY KEY, {columns})")
+def create_table(conn, table_name, columns):
+    """ Creates a table with specified columns. """
+    columns_definition = ', '.join(f'{col} TEXT' for col in columns)
+    execute_sql(conn, f"CREATE TABLE IF NOT EXISTS {table_name} (id TEXT PRIMARY KEY, {columns_definition})")
 
 
 def store_issues_in_db(issues):
@@ -100,7 +37,8 @@ def store_issues_in_db(issues):
     with sqlite3.connect(DB_NAME) as conn:
         if execute_sql(conn, f"SELECT name FROM sqlite_master WHERE type='table' AND name='{TABLE_NAME}'").fetchone():
             backup_table(conn, TABLE_NAME)
-        create_table_from_issues(conn, issues)
+        all_fields = {k for issue in issues for k, v in issue['fields'].items() if v is not None}
+        create_table(conn, TABLE_NAME, all_fields)
 
         for issue in issues:
             fields = {k: v for k, v in issue['fields'].items() if v is not None}
@@ -170,58 +108,6 @@ def fetch_earliest_ticket_date():
     return None
 
 
-def fetch_git_commits_since(date):
-    """ Fetches commit information from the Git repository starting from the given date. """
-    if not REPO_PATH or not os.path.exists(REPO_PATH):
-        console.print("[bold red]Repository path is not set or does not exist. Please check the REPO_PATH environment variable.[/bold red]")
-        input("Press Enter to return to the menu...")
-        return []
-
-    original_cwd = os.getcwd()
-    os.chdir(REPO_PATH)
-    try:
-        commits = subprocess.check_output(['git', 'log', f'--since={date}', '--pretty=format:%H|%an|%ae|%ad|%s']).decode('utf-8').split('\n')
-    except subprocess.CalledProcessError as e:
-        console.print(f"[bold red]Failed to fetch commits: {e}[/bold red]")
-        commits = []
-    finally:
-        os.chdir(original_cwd)
-
-    return commits
-
-
-def create_git_commits_table(conn):
-    """ Creates the git_commits table if it does not exist. """
-    execute_sql(conn, '''
-        CREATE TABLE IF NOT EXISTS git_commits (
-            hash TEXT PRIMARY KEY,
-            author_name TEXT,
-            author_email TEXT,
-            date TEXT,
-            message TEXT
-        )
-    ''')
-
-
-def store_commits_in_db(commits):
-    """ Stores commit information in the SQLite3 database. """
-    with sqlite3.connect(DB_NAME) as conn:
-        if execute_sql(conn, "SELECT name FROM sqlite_master WHERE type='table' AND name='git_commits'").fetchone():
-            backup_table(conn, 'git_commits')
-        create_git_commits_table(conn)
-
-        for commit in commits:
-            if commit.strip():
-                try:
-                    hash, author_name, author_email, date, message = commit.split('|', 4)
-                    execute_sql(conn, '''
-                        INSERT OR REPLACE INTO git_commits (hash, author_name, author_email, date, message)
-                        VALUES (?, ?, ?, ?, ?)
-                    ''', (hash, author_name, author_email, date, message))
-                except ValueError:
-                    console.print(f"[bold red]Error processing commit: {commit}[/bold red]")
-
-
 def update_git_commits():
     """ Updates the git_commits table with commits since the earliest Jira ticket date. """
     if not os.path.exists(DB_NAME):
@@ -260,6 +146,38 @@ def update_git_commits():
     display_commits()
 
 
+def store_commits_in_db(commits):
+    """ Stores commit information in the SQLite3 database. """
+    with sqlite3.connect(DB_NAME) as conn:
+        if execute_sql(conn, "SELECT name FROM sqlite_master WHERE type='table' AND name='git_commits'").fetchone():
+            backup_table(conn, 'git_commits')
+        create_git_commits_table(conn)
+
+        for commit in commits:
+            if commit.strip():
+                try:
+                    hash, author_name, author_email, date, message = commit.split('|', 4)
+                    execute_sql(conn, '''
+                        INSERT OR REPLACE INTO git_commits (hash, author_name, author_email, date, message)
+                        VALUES (?, ?, ?, ?, ?)
+                    ''', (hash, author_name, author_email, date, message))
+                except ValueError:
+                    console.print(f"[bold red]Error processing commit: {commit}[/bold red]")
+
+
+def create_git_commits_table(conn):
+    """ Creates the git_commits table if it does not exist. """
+    execute_sql(conn, '''
+        CREATE TABLE IF NOT EXISTS git_commits (
+            hash TEXT PRIMARY KEY,
+            author_name TEXT,
+            author_email TEXT,
+            date TEXT,
+            message TEXT
+        )
+    ''')
+
+
 def display_commits():
     """ Displays commit information from the git_commits table. """
     if not os.path.exists(DB_NAME):
@@ -288,50 +206,3 @@ def display_commits():
             columns_to_display = columns_in_db
 
         display_table_data(conn, 'git_commits', columns_to_display)
-
-
-@click.group(invoke_without_command=True)
-@click.pass_context
-def cli(ctx):
-    """SDM Tools: Manage your team's Jira tasks with style!"""
-    manage_issues()
-
-
-@cli.command()
-def manage_issues():
-    """Manage Jira issues."""
-    while True:
-        clear_screen()
-        print_banner()
-        console.print("[bold yellow]Choose an option:[/bold yellow]")
-        console.print("[bold cyan]1. Update and display issues from Jira[/bold cyan]")
-        console.print("[bold cyan]2. Display issues from stored data[/bold cyan]")
-        console.print("[bold cyan]3. Update commit information from repository[/bold cyan]")
-        console.print("[bold cyan]4. Display commit information from stored data[/bold cyan]")
-        console.print("[bold cyan]5. Exit[/bold cyan]")
-
-        choice = console.input("[bold magenta]Enter your choice (1/2/3/4/5): [/bold magenta]")
-
-        if choice == '1':
-            issue_ids = fetch_issue_ids()
-            issues = fetch_issue_details(issue_ids)
-            if issues:
-                store_issues_in_db(issues)
-                console.print("[bold green]Issues updated from Jira and stored in the database.[/bold green]")
-                display_issues()
-        elif choice == '2':
-            display_issues()
-        elif choice == '3':
-            update_git_commits()
-        elif choice == '4':
-            display_commits()
-        elif choice == '5':
-            console.print("[bold red]Exiting SDM Tools.[/bold red]")
-            break
-        else:
-            console.print("[bold red]Invalid choice. Please try again.[/bold red]")
-            input("Press Enter to return to the menu...")
-
-
-if __name__ == "__main__":
-    cli()
