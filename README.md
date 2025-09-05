@@ -1,6 +1,6 @@
 # SDM-Tools
 
-SDM-Tools is a command-line interface (CLI) tool designed for Software Development Managers (SDMs) to manage and analyze their team's Jira tasks and repository commits. The tool provides customized insights and actions, making it easier to track and manage issues, backlog, sprint planning, and commit history.
+SDM-Tools is a command-line interface (CLI) tool designed for Software Delivery Managers (SDMs) to manage and analyze their team's Jira tasks and repository commits. The tool provides customized insights and actions, making it easier to track and manage issues, backlog, sprint planning, and commit history.
 
 ## Features
 
@@ -9,7 +9,6 @@ SDM-Tools is a command-line interface (CLI) tool designed for Software Developme
 - Monitor current work and provide detailed views of tasks.
 - Store and display Jira issues with customizable columns.
 - Backup and update Jira data with ease.
-- Write raw payloads to a file for inspection.
 - Fetch and store commit information from the repository.
 - Display commit information with pagination and colorful output.
 
@@ -85,10 +84,16 @@ export REPO_PATH='/path/to/repo'
 
 Load environment variables and run the CLI tool:
 
-```bash
-set -a; source .env; set +a
-python sdm_tools.py
-```
+1. **Load environment variables**:
+
+   ```bash
+   set -a; source .env; set +a
+   ```
+
+2. **Run the CLI tool**:
+   ```bash
+   python -m sdm_tools.cli
+   ```
 
 Follow the on-screen menu to manage and display Jira issues and commit information.
 
