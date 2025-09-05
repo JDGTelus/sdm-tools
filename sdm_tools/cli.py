@@ -2,7 +2,6 @@
 import click
 from .utils import clear_screen, print_banner, console
 from .jira import fetch_issue_ids, fetch_issue_details
-from .git import fetch_git_commits_since
 from .database import store_issues_in_db, display_issues, update_git_commits, display_commits
 
 
