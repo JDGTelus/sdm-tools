@@ -10,3 +10,4 @@ DISPLAY_COLUMNS = os.getenv('DISPLAY_COLUMNS', 'key,summary,assignee,status').sp
 DB_NAME = os.getenv('DB_NAME', 'sdm_tools.db')
 TABLE_NAME = os.getenv('TABLE_NAME', 'iotmi_3p_issues')
 REPO_PATH = os.getenv('REPO_PATH')
+REPO_NAME = os.getenv('REPO_NAME')
