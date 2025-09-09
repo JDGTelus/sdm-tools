@@ -12,6 +12,7 @@ from .database import (
     store_codecommit_merges_in_db, display_codecommit_merges,
     store_codecommit_reviews_in_db, display_codecommit_reviews
 )
+from .reports import generate_all_reports
 
 
 @click.group(invoke_without_command=True)
@@ -35,9 +36,10 @@ def manage_issues():
         console.print("[bold cyan]5. Update and display CodeCommit pull requests[/bold cyan]")
         console.print("[bold cyan]6. Update and display CodeCommit merges[/bold cyan]")
         console.print("[bold cyan]7. Update and display CodeCommit reviews[/bold cyan]")
-        console.print("[bold cyan]8. Exit[/bold cyan]")
+        console.print("[bold magenta]8. Generate comprehensive reports and insights[/bold magenta]")
+        console.print("[bold cyan]9. Exit[/bold cyan]")
 
-        choice = console.input("[bold green]Enter your choice (1/2/3/4/5/6/7/8): [/bold green]")
+        choice = console.input("[bold green]Enter your choice (1/2/3/4/5/6/7/8/9): [/bold green]")
 
         if choice == '1':
             issue_ids = fetch_issue_ids()
@@ -83,6 +85,10 @@ def manage_issues():
                 console.print("[bold green]CodeCommit reviews updated and stored in the database.[/bold green]")
                 display_codecommit_reviews()
         elif choice == '8':
+            console.print("[bold yellow]Generating comprehensive reports...[/bold yellow]")
+            generate_all_reports()
+            input("\nPress Enter to return to the menu...")
+        elif choice == '9':
             console.print("[bold red]Exiting SDM Tools.[/bold red]")
             break
         else:
