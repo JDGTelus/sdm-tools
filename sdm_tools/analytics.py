@@ -81,9 +81,13 @@ class DeveloperAnalytics:
                     try:
                         commit_date = datetime.strptime(date_str, "%a %b %d %H:%M:%S %Y %z")
                     except ValueError:
-                        # Try without timezone
+                        # Try parsing with different timezone formats
                         try:
-                            commit_date = datetime.strptime(date_str.split(' +')[0].split(' -')[0], "%a %b %d %H:%M:%S %Y")
+                            # Handle formats like "Thu Aug 14 06:38:16 2025 -0600"
+                            import re
+                            # Remove timezone and parse
+                            date_without_tz = re.sub(r'\s[+-]\d{4}$', '', date_str)
+                            commit_date = datetime.strptime(date_without_tz, "%a %b %d %H:%M:%S %Y")
                         except ValueError:
                             # Skip this commit if we can't parse the date
                             continue
@@ -343,16 +347,71 @@ class DeveloperAnalytics:
         commit_metrics = self.get_commit_metrics()
         jira_metrics = self.get_jira_metrics()
         
-        # Get all unique developers
-        all_developers = set()
-        all_developers.update(commit_metrics.keys())
-        all_developers.update(jira_metrics.keys())
+        # Get team members from Jira (these are the people we want to include)
+        team_members = self.team_extractor.extract_team_members()
+        team_emails = {email.lower() for _, email in team_members if email}
+        team_names = {name for name, _ in team_members if name}
+        
+        console.print(f"[cyan]Found {len(team_members)} team members from Jira data[/cyan]")
+        
+        # Create a mapping to consolidate developers by email
+        developer_mapping = {}  # email -> (preferred_name, email)
+        
+        # First, map all team members by email
+        for team_name, team_email in team_members:
+            if team_email:
+                email_key = team_email.lower()
+                if email_key not in developer_mapping:
+                    developer_mapping[email_key] = (team_name, team_email)
+        
+        # Filter developers to only include team members
+        filtered_developers = {}  # email -> (name, email, commit_data, jira_data)
+        
+        # Check git commit authors against team members
+        for (git_name, git_email), commit_data in commit_metrics.items():
+            if git_email and git_email.lower() in team_emails:
+                email_key = git_email.lower()
+                # Use team name from Jira if available, otherwise use git name
+                preferred_name = developer_mapping.get(email_key, (git_name, git_email))[0]
+                
+                if email_key not in filtered_developers:
+                    filtered_developers[email_key] = {
+                        'name': preferred_name,
+                        'email': git_email,
+                        'commit_data': commit_data,
+                        'jira_data': {}
+                    }
+                else:
+                    # Merge commit data
+                    filtered_developers[email_key]['commit_data'] = commit_data
+        
+        console.print(f"[green]Found {len(filtered_developers)} team members with git commits[/green]")
+        
+        # Add Jira metrics for team members
+        for (jira_name, jira_email), jira_data in jira_metrics.items():
+            if jira_email and jira_email.lower() in team_emails:
+                email_key = jira_email.lower()
+                
+                if email_key not in filtered_developers:
+                    filtered_developers[email_key] = {
+                        'name': jira_name,
+                        'email': jira_email,
+                        'commit_data': {},
+                        'jira_data': jira_data
+                    }
+                else:
+                    # Merge jira data
+                    filtered_developers[email_key]['jira_data'] = jira_data
+        
+        console.print(f"[green]Final count: {len(filtered_developers)} team members for analysis[/green]")
         
         developer_metrics = []
         
-        for name, email in track(all_developers, description="Processing developers..."):
-            commit_data = commit_metrics.get((name, email), {})
-            jira_data = jira_metrics.get((name, email), {})
+        for email_key, dev_data in track(filtered_developers.items(), description="Processing team members..."):
+            name = dev_data['name']
+            email = dev_data['email']
+            commit_data = dev_data['commit_data']
+            jira_data = dev_data['jira_data']
             
             # Calculate scores
             productivity_score = self.calculate_productivity_score(commit_data, jira_data)
