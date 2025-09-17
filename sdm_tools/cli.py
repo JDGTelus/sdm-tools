@@ -6,6 +6,7 @@ from .jira import fetch_issue_ids, fetch_issue_details
 from .database import (
     store_issues_in_db, display_issues, update_git_commits, display_commits
 )
+from .analytics import run_analytics_report
 
 
 @click.group(invoke_without_command=True)
@@ -26,9 +27,10 @@ def manage_issues():
         console.print("[bold cyan]2. Display issues from stored data[/bold cyan]")
         console.print("[bold cyan]3. Update commit information from repository[/bold cyan]")
         console.print("[bold cyan]4. Display commit information from stored data[/bold cyan]")
-        console.print("[bold cyan]5. Exit[/bold cyan]")
+        console.print("[bold magenta]5. Generate Developer Performance Analytics[/bold magenta]")
+        console.print("[bold cyan]6. Exit[/bold cyan]")
 
-        choice = console.input("[bold green]Enter your choice (1/2/3/4/5): [/bold green]")
+        choice = console.input("[bold green]Enter your choice (1/2/3/4/5/6): [/bold green]")
 
         if choice == '1':
             issue_ids = fetch_issue_ids()
@@ -46,6 +48,13 @@ def manage_issues():
         elif choice == '4':
             display_commits()
         elif choice == '5':
+            console.print("[bold blue]🔍 Generating Developer Performance Analytics...[/bold blue]")
+            try:
+                run_analytics_report()
+            except Exception as e:
+                console.print(f"[bold red]Error generating analytics: {e}[/bold red]")
+            input("Press Enter to return to the menu...")
+        elif choice == '6':
             console.print("[bold red]Exiting SDM Tools.[/bold red]")
             break
         else:
