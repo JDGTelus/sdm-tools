@@ -7,15 +7,11 @@ from .database import (
     store_issues_in_db, display_issues, update_git_commits, display_commits
 )
 from .analytics import run_analytics_report
-
-
 @click.group(invoke_without_command=True)
 @click.pass_context
 def cli(ctx):
     """SDM Tools: Manage your team's Jira tasks with style!"""
     manage_issues()
-
-
 @cli.command()
 def manage_issues():
     """Manage Jira issues."""
@@ -27,11 +23,10 @@ def manage_issues():
         console.print("[bold cyan]2. Display issues from stored data[/bold cyan]")
         console.print("[bold cyan]3. Update commit information from repository[/bold cyan]")
         console.print("[bold cyan]4. Display commit information from stored data[/bold cyan]")
-        console.print("[bold magenta]5. Generate Developer Performance Analytics[/bold magenta]")
-        console.print("[bold cyan]6. Exit[/bold cyan]")
-
-        choice = console.input("[bold green]Enter your choice (1/2/3/4/5/6): [/bold green]")
-
+        console.print("[bold magenta]5. Update Developer Performance Analytics[/bold magenta]")
+        console.print("[bold magenta]6. Display Developer Performance Analytics[/bold magenta]")
+        console.print("[bold cyan]7. Exit[/bold cyan]")
+        choice = console.input("[bold green]Enter your choice (1/2/3/4/5/6/7): [/bold green]")
         if choice == '1':
             issue_ids = fetch_issue_ids()
             issues = fetch_issue_details(issue_ids)
@@ -48,19 +43,27 @@ def manage_issues():
         elif choice == '4':
             display_commits()
         elif choice == '5':
-            console.print("[bold blue]🔍 Generating Developer Performance Analytics...[/bold blue]")
+            console.print("[bold blue]🔍 Updating Developer Performance Analytics...[/bold blue]")
             try:
-                run_analytics_report()
+                from .analytics import update_analytics_data
+                update_analytics_data()
+                console.print("[bold green]Analytics data updated successfully![/bold green]")
             except Exception as e:
-                console.print(f"[bold red]Error generating analytics: {e}[/bold red]")
+                console.print(f"[bold red]Error updating analytics: {e}[/bold red]")
             input("Press Enter to return to the menu...")
         elif choice == '6':
+            console.print("[bold blue]📊 Displaying Developer Performance Analytics...[/bold blue]")
+            try:
+                from .analytics import display_analytics_reports
+                display_analytics_reports()
+            except Exception as e:
+                console.print(f"[bold red]Error displaying analytics: {e}[/bold red]")
+            input("Press Enter to return to the menu...")
+        elif choice == '7':
             console.print("[bold red]Exiting SDM Tools.[/bold red]")
             break
         else:
             console.print("[bold red]Invalid choice. Please try again.[/bold red]")
             input("Press Enter to return to the menu...")
-
-
 if __name__ == "__main__":
     cli()
