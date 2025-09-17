@@ -56,3 +56,6 @@ build/
 
 # temp txt output
 *.txt
+
+# dist dir
+dist/
