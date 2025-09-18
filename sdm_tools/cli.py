@@ -5,7 +5,8 @@ import click
 from .utils import clear_screen, print_banner, console
 from .jira import fetch_issue_ids, fetch_issue_details
 from .database import (
-    store_issues_in_db, display_issues, update_git_commits, display_commits
+    store_issues_in_db, display_issues, update_git_commits, display_commits,
+    generate_developer_stats_json
 )
 from .config import DB_NAME, TABLE_NAME
 
@@ -142,6 +143,55 @@ def handle_commits_option():
             input("Press Enter to return to the menu...")
 
 
+def handle_developer_stats_option():
+    """Handle the developer stats option (display or generate JSON with stats)."""
+    import os
+    from .database.stats import STATS_FILENAME, display_existing_stats
+
+    # Check if stats file already exists
+    if os.path.exists(STATS_FILENAME):
+        # Data exists, ask if user wants to update or just display
+        update_choice = console.input(
+            "[bold yellow]Developer statistics file already exists. Do you want to update it? (y/N): [/bold yellow]").strip().lower()
+
+        if update_choice == 'y' or update_choice == 'yes':
+            # User wants to update
+            console.print(
+                "[bold yellow]Generating updated developer statistics from Jira issues and git commits...[/bold yellow]")
+            try:
+                json_filename = generate_developer_stats_json()
+                if not json_filename:
+                    console.print(
+                        "[bold red]Failed to generate developer statistics.[/bold red]")
+                    input("Press Enter to return to the menu...")
+            except Exception as e:
+                console.print(
+                    f"[bold red]Error generating developer statistics: {str(e)}[/bold red]")
+                input("Press Enter to return to the menu...")
+        else:
+            # User wants to just display existing data
+            try:
+                display_existing_stats()
+            except Exception as e:
+                console.print(
+                    f"[bold red]Error displaying existing statistics: {str(e)}[/bold red]")
+                input("Press Enter to return to the menu...")
+    else:
+        # No data exists, generate it
+        console.print(
+            "[bold yellow]No developer statistics file found. Generating from Jira issues and git commits...[/bold yellow]")
+        try:
+            json_filename = generate_developer_stats_json()
+            if not json_filename:
+                console.print(
+                    "[bold red]Failed to generate developer statistics.[/bold red]")
+                input("Press Enter to return to the menu...")
+        except Exception as e:
+            console.print(
+                f"[bold red]Error generating developer statistics: {str(e)}[/bold red]")
+            input("Press Enter to return to the menu...")
+
+
 @cli.command()
 def manage_issues():
     """Manage Jira issues."""
@@ -154,16 +204,20 @@ def manage_issues():
             "[bold cyan]1. Manage Jira issues (get/update/display)[/bold cyan]")
         console.print(
             "[bold cyan]2. Manage git commits (get/update/display)[/bold cyan]")
-        console.print("[bold cyan]3. Exit[/bold cyan]")
+        console.print(
+            "[bold cyan]3. Developer statistics JSON (update/display)[/bold cyan]")
+        console.print("[bold cyan]4. Exit[/bold cyan]")
 
         choice = console.input(
-            "[bold green]Enter your choice (1/2/3): [/bold green]")
+            "[bold green]Enter your choice (1/2/3/4): [/bold green]")
 
         if choice == '1':
             handle_issues_option()
         elif choice == '2':
             handle_commits_option()
         elif choice == '3':
+            handle_developer_stats_option()
+        elif choice == '4':
             console.print("[bold red]Exiting SDM Tools.[/bold red]")
             break
         else:
