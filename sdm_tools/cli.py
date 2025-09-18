@@ -8,7 +8,8 @@ from .database import (
     store_issues_in_db, display_issues, update_git_commits, display_commits,
     generate_developer_stats_json
 )
-from .config import DB_NAME, TABLE_NAME
+from .database.stats import generate_basic_stats_json, display_existing_basic_stats
+from .config import DB_NAME, TABLE_NAME, BASIC_FILENAME
 
 
 @click.group(invoke_without_command=True)
@@ -192,6 +193,58 @@ def handle_developer_stats_option():
             input("Press Enter to return to the menu...")
 
 
+def handle_basic_stats_option():
+    """Handle the basic stats option (display or generate JSON with time-based stats)."""
+    if not BASIC_FILENAME:
+        console.print(
+            "[bold red]BASIC_STATS environment variable is not set. Please configure it in your .env file.[/bold red]")
+        input("Press Enter to return to the menu...")
+        return
+
+    # Check if basic stats file already exists
+    if os.path.exists(BASIC_FILENAME):
+        # Data exists, ask if user wants to update or just display
+        update_choice = console.input(
+            f"[bold yellow]Basic statistics file ({BASIC_FILENAME}) already exists. Do you want to update it? (y/N): [/bold yellow]").strip().lower()
+
+        if update_choice == 'y' or update_choice == 'yes':
+            # User wants to update
+            console.print(
+                "[bold yellow]Generating updated basic statistics from Jira issues and git commits...[/bold yellow]")
+            try:
+                json_filename = generate_basic_stats_json()
+                if not json_filename:
+                    console.print(
+                        "[bold red]Failed to generate basic statistics.[/bold red]")
+                    input("Press Enter to return to the menu...")
+            except Exception as e:
+                console.print(
+                    f"[bold red]Error generating basic statistics: {str(e)}[/bold red]")
+                input("Press Enter to return to the menu...")
+        else:
+            # User wants to just display existing data
+            try:
+                display_existing_basic_stats()
+            except Exception as e:
+                console.print(
+                    f"[bold red]Error displaying existing basic statistics: {str(e)}[/bold red]")
+                input("Press Enter to return to the menu...")
+    else:
+        # No data exists, generate it
+        console.print(
+            f"[bold yellow]No basic statistics file found ({BASIC_FILENAME}). Generating from Jira issues and git commits...[/bold yellow]")
+        try:
+            json_filename = generate_basic_stats_json()
+            if not json_filename:
+                console.print(
+                    "[bold red]Failed to generate basic statistics.[/bold red]")
+                input("Press Enter to return to the menu...")
+        except Exception as e:
+            console.print(
+                f"[bold red]Error generating basic statistics: {str(e)}[/bold red]")
+            input("Press Enter to return to the menu...")
+
+
 @cli.command()
 def manage_issues():
     """Manage Jira issues."""
@@ -205,19 +258,23 @@ def manage_issues():
         console.print(
             "[bold cyan]2. Manage git commits (get/update/display)[/bold cyan]")
         console.print(
-            "[bold cyan]3. Developer statistics JSON (update/display)[/bold cyan]")
-        console.print("[bold cyan]4. Exit[/bold cyan]")
+            "[bold cyan]3. Team basic stats JSON (update/display)[/bold cyan]")
+        console.print(
+            "[bold cyan]4. Team simple stats JSON (update/display)[/bold cyan]")
+        console.print("[bold cyan]5. Exit[/bold cyan]")
 
         choice = console.input(
-            "[bold green]Enter your choice (1/2/3/4): [/bold green]")
+            "[bold green]Enter your choice (1/2/3/4/5): [/bold green]")
 
         if choice == '1':
             handle_issues_option()
         elif choice == '2':
             handle_commits_option()
         elif choice == '3':
-            handle_developer_stats_option()
+            handle_basic_stats_option()
         elif choice == '4':
+            handle_developer_stats_option()
+        elif choice == '5':
             console.print("[bold red]Exiting SDM Tools.[/bold red]")
             break
         else:

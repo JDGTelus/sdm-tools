@@ -420,3 +420,289 @@ def display_existing_stats():
         console.print(
             f"[bold red]Error reading statistics file: {str(e)}[/bold red]")
         input("Press Enter to return to the menu...")
+
+
+def generate_basic_stats_json():
+    """Generates a JSON file with basic time-based developer statistics."""
+    from ..config import BASIC_FILENAME
+
+    if not os.path.exists(DB_NAME):
+        console.print(
+            "[bold red]Database does not exist. Please update issues and commits first.[/bold red]")
+        input("Press Enter to return to the menu...")
+        return None
+
+    with sqlite3.connect(DB_NAME) as conn:
+        cursor = conn.cursor()
+
+        # Check if both tables exist
+        cursor.execute(
+            f"SELECT name FROM sqlite_master WHERE type='table' AND name='{TABLE_NAME}'")
+        if not cursor.fetchone():
+            console.print(
+                "[bold red]No Jira issues data found. Please update issues first.[/bold red]")
+            input("Press Enter to return to the menu...")
+            return None
+
+        cursor.execute(
+            "SELECT name FROM sqlite_master WHERE type='table' AND name='git_commits'")
+        if not cursor.fetchone():
+            console.print(
+                "[bold red]No git commits data found. Please update commits first.[/bold red]")
+            input("Press Enter to return to the menu...")
+            return None
+
+        # Get all assignees from Jira issues (excluding empty/null assignees)
+        cursor.execute(f"""
+            SELECT DISTINCT assignee 
+            FROM {TABLE_NAME} 
+            WHERE assignee IS NOT NULL AND assignee != '' AND assignee != 'null'
+        """)
+        assignees = [row[0] for row in cursor.fetchall()]
+
+        if not assignees:
+            console.print(
+                "[bold red]No assignees found in Jira issues.[/bold red]")
+            input("Press Enter to return to the menu...")
+            return None
+
+        developer_basic_stats = {}
+
+        for assignee in assignees:
+            stats = {
+                "name": assignee,
+                "commits": {
+                    "last_1_day": 0,
+                    "last_3_days": 0,
+                    "last_7_days": 0
+                },
+                "jira_updates": {
+                    "last_1_day": 0,
+                    "last_3_days": 0,
+                    "last_7_days": 0
+                }
+            }
+
+            # Get commit statistics for time periods
+            commit_stats = get_time_based_commit_stats(cursor, assignee)
+            stats["commits"] = commit_stats
+
+            # Get Jira update statistics for time periods
+            jira_update_stats = get_time_based_jira_stats(cursor, assignee)
+            stats["jira_updates"] = jira_update_stats
+
+            developer_basic_stats[assignee] = stats
+
+        # Create final JSON structure
+        final_json = {
+            "generated_at": datetime.now().isoformat(),
+            "developers": developer_basic_stats
+        }
+
+        # Backup existing file if it exists
+        if os.path.exists(BASIC_FILENAME):
+            timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+            backup_filename = f"{BASIC_FILENAME.replace('.json', '')}_backup_{timestamp}.json"
+            shutil.copy2(BASIC_FILENAME, backup_filename)
+            console.print(
+                f"[bold yellow]Existing basic stats file backed up to: {backup_filename}[/bold yellow]")
+
+        # Write to basic stats JSON filename
+        with open(BASIC_FILENAME, 'w') as f:
+            json.dump(final_json, f, indent=2, default=str)
+
+        # Display summary table
+        display_basic_stats_summary(developer_basic_stats)
+
+        # Show completion message
+        console.print(
+            f"\n[bold green]Basic statistics file created: {BASIC_FILENAME}[/bold green]")
+
+        input("\nPress Enter to return to the menu...")
+        return BASIC_FILENAME
+
+
+def get_time_based_commit_stats(cursor, assignee):
+    """Get commit statistics for specific time periods."""
+    from datetime import datetime, timedelta
+
+    stats = {
+        "last_1_day": 0,
+        "last_3_days": 0,
+        "last_7_days": 0
+    }
+
+    # Extract email from assignee JSON if possible
+    try:
+        import ast
+        assignee_dict = ast.literal_eval(assignee)
+        assignee_email = assignee_dict.get('emailAddress', '')
+        assignee_name = assignee_dict.get('displayName', '')
+    except:
+        assignee_email = ''
+        assignee_name = assignee
+
+    # Calculate date thresholds
+    now = datetime.now()
+    one_day_ago = (now - timedelta(days=1)).strftime('%Y-%m-%d')
+    three_days_ago = (now - timedelta(days=3)).strftime('%Y-%m-%d')
+    seven_days_ago = (now - timedelta(days=7)).strftime('%Y-%m-%d')
+
+    # Search patterns for matching commits
+    search_patterns = []
+    if assignee_email:
+        search_patterns.append(assignee_email)
+    if assignee_name:
+        search_patterns.append(assignee_name)
+
+    for pattern in search_patterns:
+        # Last 1 day
+        cursor.execute("""
+            SELECT COUNT(*) 
+            FROM git_commits 
+            WHERE (author_name LIKE ? OR author_email LIKE ?) 
+            AND date >= ?
+        """, (f"%{pattern}%", f"%{pattern}%", one_day_ago))
+        count = cursor.fetchone()[0]
+        stats["last_1_day"] += count
+
+        # Last 3 days
+        cursor.execute("""
+            SELECT COUNT(*) 
+            FROM git_commits 
+            WHERE (author_name LIKE ? OR author_email LIKE ?) 
+            AND date >= ?
+        """, (f"%{pattern}%", f"%{pattern}%", three_days_ago))
+        count = cursor.fetchone()[0]
+        stats["last_3_days"] += count
+
+        # Last 7 days
+        cursor.execute("""
+            SELECT COUNT(*) 
+            FROM git_commits 
+            WHERE (author_name LIKE ? OR author_email LIKE ?) 
+            AND date >= ?
+        """, (f"%{pattern}%", f"%{pattern}%", seven_days_ago))
+        count = cursor.fetchone()[0]
+        stats["last_7_days"] += count
+
+    return stats
+
+
+def get_time_based_jira_stats(cursor, assignee):
+    """Get Jira update statistics for specific time periods."""
+    from datetime import datetime, timedelta
+
+    stats = {
+        "last_1_day": 0,
+        "last_3_days": 0,
+        "last_7_days": 0
+    }
+
+    # Calculate date thresholds
+    now = datetime.now()
+    one_day_ago = (now - timedelta(days=1)).isoformat()
+    three_days_ago = (now - timedelta(days=3)).isoformat()
+    seven_days_ago = (now - timedelta(days=7)).isoformat()
+
+    # Check if updated column exists
+    cursor.execute(f"PRAGMA table_info({TABLE_NAME})")
+    columns = [info[1] for info in cursor.fetchall()]
+
+    if 'updated' in columns:
+        # Last 1 day
+        cursor.execute(f"""
+            SELECT COUNT(*) 
+            FROM {TABLE_NAME} 
+            WHERE assignee = ? AND updated >= ?
+        """, (assignee, one_day_ago))
+        stats["last_1_day"] = cursor.fetchone()[0]
+
+        # Last 3 days
+        cursor.execute(f"""
+            SELECT COUNT(*) 
+            FROM {TABLE_NAME} 
+            WHERE assignee = ? AND updated >= ?
+        """, (assignee, three_days_ago))
+        stats["last_3_days"] = cursor.fetchone()[0]
+
+        # Last 7 days
+        cursor.execute(f"""
+            SELECT COUNT(*) 
+            FROM {TABLE_NAME} 
+            WHERE assignee = ? AND updated >= ?
+        """, (assignee, seven_days_ago))
+        stats["last_7_days"] = cursor.fetchone()[0]
+
+    return stats
+
+
+def display_basic_stats_summary(developer_basic_stats):
+    """Display a summary table of basic developer statistics."""
+    table = Table(show_header=True, header_style="bold green")
+    table.add_column("Developer")
+    table.add_column("Email")
+    table.add_column("Commits (1d)")
+    table.add_column("Commits (3d)")
+    table.add_column("Commits (7d)")
+    table.add_column("Jira Updates (1d)")
+    table.add_column("Jira Updates (3d)")
+    table.add_column("Jira Updates (7d)")
+
+    for assignee_json, stats in developer_basic_stats.items():
+        # Extract clean name and email for display
+        name, email = extract_developer_info(assignee_json)
+
+        table.add_row(
+            name,
+            email,
+            str(stats["commits"]["last_1_day"]),
+            str(stats["commits"]["last_3_days"]),
+            str(stats["commits"]["last_7_days"]),
+            str(stats["jira_updates"]["last_1_day"]),
+            str(stats["jira_updates"]["last_3_days"]),
+            str(stats["jira_updates"]["last_7_days"])
+        )
+
+    console.print(
+        "\n[bold yellow]Basic Developer Statistics Summary:[/bold yellow]")
+    console.print(table)
+
+
+def display_existing_basic_stats():
+    """Display existing basic developer statistics from the JSON file."""
+    from ..config import BASIC_FILENAME
+
+    if not os.path.exists(BASIC_FILENAME):
+        console.print(
+            f"[bold red]No basic statistics file found: {BASIC_FILENAME}[/bold red]")
+        input("Press Enter to return to the menu...")
+        return
+
+    try:
+        with open(BASIC_FILENAME, 'r') as f:
+            stats_data = json.load(f)
+
+        developer_stats = stats_data.get("developers", {})
+        if not developer_stats:
+            console.print(
+                "[bold red]No developer statistics found in the file.[/bold red]")
+            input("Press Enter to return to the menu...")
+            return
+
+        # Display the summary table
+        display_basic_stats_summary(developer_stats)
+
+        # Show file info
+        generated_at = stats_data.get("generated_at", "Unknown")
+        console.print(
+            f"\n[bold green]Basic statistics loaded from: {BASIC_FILENAME}[/bold green]")
+        console.print(
+            f"[bold yellow]Generated at: {generated_at}[/bold yellow]")
+
+        input("\nPress Enter to return to the menu...")
+
+    except Exception as e:
+        console.print(
+            f"[bold red]Error reading basic statistics file: {str(e)}[/bold red]")
+        input("Press Enter to return to the menu...")
