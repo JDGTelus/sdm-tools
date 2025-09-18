@@ -7,7 +7,7 @@ from datetime import datetime
 from collections import defaultdict
 from rich.console import Console
 from rich.table import Table
-from ..config import DB_NAME, TABLE_NAME, STATS_FILENAME
+from ..config import DB_NAME, TABLE_NAME, STATS_FILENAME, EXCLUDED_EMAILS
 
 console = Console()
 
@@ -34,6 +34,18 @@ def extract_developer_info(assignee_json_str):
         return name, email
     except:
         return assignee_json_str, 'Unknown'
+
+
+def should_exclude_email(email):
+    """Check if an email should be excluded from the output."""
+    if not email or email == 'Unknown':
+        return False
+
+    # Clean up the excluded emails list (remove empty strings and whitespace)
+    excluded_emails = [e.strip().lower() for e in EXCLUDED_EMAILS if e.strip()]
+
+    # Check if the email matches any excluded email (case-insensitive)
+    return email.lower() in excluded_emails
 
 
 def generate_developer_stats_json():
@@ -78,9 +90,22 @@ def generate_developer_stats_json():
             input("Press Enter to return to the menu...")
             return None
 
+        # Filter out excluded emails
+        filtered_assignees = []
+        for assignee in assignees:
+            _, email = extract_developer_info(assignee)
+            if not should_exclude_email(email):
+                filtered_assignees.append(assignee)
+
+        if not filtered_assignees:
+            console.print(
+                "[bold red]No assignees found after filtering excluded emails.[/bold red]")
+            input("Press Enter to return to the menu...")
+            return None
+
         developer_stats = {}
 
-        for assignee in assignees:
+        for assignee in filtered_assignees:
             stats = {
                 "name": assignee,
                 "jira_stats": {},
@@ -466,9 +491,22 @@ def generate_basic_stats_json():
             input("Press Enter to return to the menu...")
             return None
 
+        # Filter out excluded emails
+        filtered_assignees = []
+        for assignee in assignees:
+            _, email = extract_developer_info(assignee)
+            if not should_exclude_email(email):
+                filtered_assignees.append(assignee)
+
+        if not filtered_assignees:
+            console.print(
+                "[bold red]No assignees found after filtering excluded emails.[/bold red]")
+            input("Press Enter to return to the menu...")
+            return None
+
         developer_basic_stats = {}
 
-        for assignee in assignees:
+        for assignee in filtered_assignees:
             stats = {
                 "name": assignee,
                 "commits": {

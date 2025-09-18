@@ -12,3 +12,5 @@ TABLE_NAME = os.getenv('TABLE_NAME')
 REPO_PATH = os.getenv('REPO_PATH')
 STATS_FILENAME = os.getenv('STATS_FILENAME')
 BASIC_FILENAME = os.getenv('BASIC_STATS')
+EXCLUDED_EMAILS = os.getenv('EXCLUDED_EMAILS', '').split(
+    ',') if os.getenv('EXCLUDED_EMAILS') else []
