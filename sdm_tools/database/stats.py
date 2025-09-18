@@ -7,11 +7,9 @@ from datetime import datetime
 from collections import defaultdict
 from rich.console import Console
 from rich.table import Table
-from ..config import DB_NAME, TABLE_NAME
+from ..config import DB_NAME, TABLE_NAME, STATS_FILENAME
 
 console = Console()
-
-STATS_FILENAME = "team_simple_stats.json"
 
 
 def backup_existing_stats_file():

@@ -11,6 +11,8 @@ SDM-Tools is a command-line interface (CLI) tool designed for Software Developer
 - Backup and update Jira data with ease.
 - Fetch and store commit information from the repository.
 - Display commit information with pagination and colorful output.
+- Generate and display team statistics in JSON format.
+- Backup existing statistics files automatically with timestamps.
 
 ## Setup
 
@@ -52,27 +54,37 @@ To generate a Jira API token:
 ### Environment Variables
 
 Set the following environment variables for configuration:
+
+#### Required Variables
 - `JIRA_URL`: Base URL for Jira API (e.g., `https://your-jira-domain.atlassian.net`)
 - `JIRA_API_TOKEN`: API token for authentication
 - `JIRA_EMAIL`: Email associated with the Jira account
 - `JQL_QUERY`: JQL query to filter issues (e.g., `project = "SET" AND component = "IOTMI 3P Connector"`)
-- `DISPLAY_COLUMNS`: Comma-separated list of columns to display (e.g., `key,summary,assignee,status`)
-- `DB_NAME`: Name of the SQLite database file (e.g., `jira_issues.db`)
-- `TABLE_NAME`: Name of the table to store issues (e.g., `iotmi_3p_issues`)
+- `DISPLAY_COLUMNS`: Comma-separated list of columns to display (e.g., `id,summary,description,assignee,reporter,status`)
 - `REPO_PATH`: Path to the local repository (e.g., `/path/to/repo`)
 
-Example of recommended `.env` to load:
+#### Optional Variables (with defaults)
+- `DB_NAME`: Name of the SQLite database file (default: `sdm_tools.db`)
+- `TABLE_NAME`: Name of the table to store issues (default: `iotmi_3p_issues`)
+- `STATS_FILENAME`: Name of the team statistics JSON file (default: `team_simple_stats.json`)
+
+#### Additional Variables
+- `REPO_NAME`: Name of the repository for reference (e.g., `your-repo-name`)
+
+Example of recommended `.env` file:
 
 ```bash
 #!/bin/bash
 export JIRA_URL='https://your-jira-domain.atlassian.net'
 export JIRA_API_TOKEN='your-api-token'
 export JIRA_EMAIL='your-email@example.com'
-export JQL_QUERY='project = "SET" AND component = "IOTMI 3P Connector"'
-export DISPLAY_COLUMNS='key,summary,assignee,status'
-export DB_NAME='jira_issues.db'
+export JQL_QUERY='project = "SET" AND component = "IOTMI 3P Connector" AND type = "Story"'
+export DISPLAY_COLUMNS='id,summary,description,assignee,reporter,status'
+export DB_NAME='sdm_tools.db'
 export TABLE_NAME='iotmi_3p_issues'
 export REPO_PATH='/path/to/repo'
+export REPO_NAME='your-repo-name'
+export STATS_FILENAME='team_simple_stats.json'
 ```
 
 ## Usage
@@ -95,5 +107,7 @@ Follow the on-screen menu to manage and display Jira issues and commit informati
 This project is licensed under the MIT License.
 
 ### Notes
+- **Configuration**: All environment variables are required and must be set before running the tool.
 - **User-Friendly Output**: The script now stores meaningful data, and the `DISPLAY_COLUMNS` environment variable is set to display relevant fields. Adjust the `DISPLAY_COLUMNS` as needed to improve the user experience.
 - **Commit Information**: The script fetches commit information from the repository and stores it in the `git_commits` table in the SQLite database. You can update and display commit information using the CLI tool.
+- **Team Statistics**: The tool can generate team statistics in JSON format, automatically backing up existing files with timestamps before creating new ones.
