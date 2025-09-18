@@ -102,12 +102,8 @@ Load environment variables and run the CLI tool:
 
 Follow the on-screen menu to manage and display Jira issues and commit information.
 
-## License
-
-This project is licensed under the MIT License.
-
 ### Notes
 - **Configuration**: All environment variables are required and must be set before running the tool.
-- **User-Friendly Output**: The script now stores meaningful data, and the `DISPLAY_COLUMNS` environment variable is set to display relevant fields. Adjust the `DISPLAY_COLUMNS` as needed to improve the user experience.
+- **User-Friendly Output**: The script stores meaningful data, and the `DISPLAY_COLUMNS` environment variable is set to display relevant fields. Adjust the `DISPLAY_COLUMNS` as needed to improve the user experience.
 - **Commit Information**: The script fetches commit information from the repository and stores it in the `git_commits` table in the SQLite database. You can update and display commit information using the CLI tool.
 - **Team Statistics**: The tool can generate team statistics in JSON format, automatically backing up existing files with timestamps before creating new ones.
