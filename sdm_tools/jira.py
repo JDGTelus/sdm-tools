@@ -11,7 +11,7 @@ def fetch_issue_ids():
                "Content-Type": "application/json"}
     all_issue_ids = []
     next_page_token = None
-    max_results = 50  # Follow Jira recommendation of max 50 records per request
+    max_results = 50  # Follow Jira restriction of max 50 records per request
 
     while True:
         # Prepare request body according to current API spec
@@ -20,7 +20,6 @@ def fetch_issue_ids():
             'maxResults': max_results,
             'fields': ['id']  # Only fetch ID field for efficiency
         }
-        # Add pagination token if available
         if next_page_token:
             request_body['nextPageToken'] = next_page_token
         response = requests.post(
@@ -34,9 +33,7 @@ def fetch_issue_ids():
                 f"Failed to fetch issue IDs: {response.status_code} - {response.text}")
         response_data = response.json()
         issues = response_data.get('issues', [])
-        # Add issue IDs from this batch
         all_issue_ids.extend([issue['id'] for issue in issues])
-        # Check if this is the last page
         is_last = response_data.get('isLast', True)
         if is_last or len(issues) == 0:
             break
