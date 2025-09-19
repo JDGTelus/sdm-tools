@@ -169,7 +169,10 @@ def handle_developer_stats_option():
             except Exception as e:
                 console.print(
                     f"[bold red]Error generating developer statistics: {str(e)}[/bold red]")
-                input("Press Enter to return to the menu...")
+                try:
+                    input("Press Enter to return to the menu...")
+                except EOFError:
+                    pass
         else:
             # User wants to just display existing data
             try:

@@ -179,7 +179,10 @@ def generate_developer_stats_json():
             console.print(
                 f"\n[bold green]Developer statistics file created: {STATS_FILENAME}[/bold green]")
 
-        input("\nPress Enter to return to the menu...")
+        try:
+            input("\nPress Enter to return to the menu...")
+        except EOFError:
+            pass
         return STATS_FILENAME
 
 
@@ -463,12 +466,18 @@ def display_existing_stats():
         console.print(
             f"[bold yellow]Generated at: {generated_at}[/bold yellow]")
 
-        input("\nPress Enter to return to the menu...")
+        try:
+            input("\nPress Enter to return to the menu...")
+        except EOFError:
+            pass
 
     except Exception as e:
         console.print(
             f"[bold red]Error reading statistics file: {str(e)}[/bold red]")
-        input("Press Enter to return to the menu...")
+        try:
+            input("Press Enter to return to the menu...")
+        except EOFError:
+            pass
 
 
 def generate_basic_stats_json():
