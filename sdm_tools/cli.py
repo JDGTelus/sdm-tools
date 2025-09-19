@@ -249,6 +249,114 @@ def handle_basic_stats_option():
             input("Press Enter to return to the menu...")
 
 
+def handle_html_generation_option():
+    """Handle the HTML generation option - creates a self-sufficient HTML dashboard."""
+    import json
+    from datetime import datetime
+    import shutil
+
+    console.print(
+        "[bold yellow]Generating self-sufficient HTML dashboard...[/bold yellow]")
+
+    # Check if basic stats JSON exists
+    if not BASIC_STATS or not os.path.exists(BASIC_STATS):
+        console.print(
+            f"[bold red]Basic statistics file not found at {BASIC_STATS}. Please generate it first using option 3.[/bold red]")
+        input("Press Enter to return to the menu...")
+        return
+
+    try:
+        # Create dist directory
+        dist_dir = "dist"
+        if not os.path.exists(dist_dir):
+            os.makedirs(dist_dir)
+            console.print(
+                f"[bold green]Created {dist_dir} directory.[/bold green]")
+
+        # Define the target filename
+        target_file = os.path.join(dist_dir, "team-basic-stats-dashboard.html")
+
+        # If target file exists, create a timestamped backup
+        if os.path.exists(target_file):
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            backup_file = os.path.join(
+                dist_dir, f"team-basic-stats-dashboard_{timestamp}.html")
+            shutil.move(target_file, backup_file)
+            console.print(
+                f"[bold yellow]Existing file backed up as: {backup_file}[/bold yellow]")
+
+        # Read the JSON data
+        with open(BASIC_STATS, 'r', encoding='utf-8') as f:
+            json_data = json.load(f)
+
+        # Read the CSS file
+        css_file = "ux/web/shared-dashboard-styles.css"
+        if not os.path.exists(css_file):
+            console.print(
+                f"[bold red]CSS file not found at {css_file}.[/bold red]")
+            input("Press Enter to return to the menu...")
+            return
+
+        with open(css_file, 'r', encoding='utf-8') as f:
+            css_content = f.read()
+
+        # Read the HTML template
+        html_file = "ux/web/team-basic-stats-dashboard.html"
+        if not os.path.exists(html_file):
+            console.print(
+                f"[bold red]HTML file not found at {html_file}.[/bold red]")
+            input("Press Enter to return to the menu...")
+            return
+
+        with open(html_file, 'r', encoding='utf-8') as f:
+            html_content = f.read()
+
+        # Replace the CSS import with inline styles
+        inline_css = f'<style>\n{css_content}\n</style>'
+        html_content = html_content.replace(
+            '<link rel="stylesheet" href="shared-dashboard-styles.css">', inline_css)
+
+        # Replace the fetch call with embedded data
+        # Use more indentation for readability
+        json_str = json.dumps(json_data, indent=8)
+
+        # Find the useEffect block and replace the entire fetch logic
+        useEffect_start = html_content.find("useEffect(() => {")
+        if useEffect_start != -1:
+            # Find the end of the useEffect block
+            useEffect_end = html_content.find("}, []);", useEffect_start)
+            if useEffect_end != -1:
+                useEffect_end += len("}, []);")
+
+                # Create the new useEffect content with embedded data
+                new_useEffect = f"""useEffect(() => {{
+            // Data embedded directly in the HTML
+            setTeamData({json_str});
+            setLoading(false);
+        }}, []);"""
+
+                # Replace the entire useEffect block
+                html_content = (html_content[:useEffect_start] +
+                                new_useEffect +
+                                html_content[useEffect_end:])
+
+        # Write the combined HTML file
+        with open(target_file, 'w', encoding='utf-8') as f:
+            f.write(html_content)
+
+        console.print(
+            f"[bold green]Self-sufficient HTML dashboard generated successfully![/bold green]")
+        console.print(f"[bold cyan]File saved as: {target_file}[/bold cyan]")
+        console.print(
+            f"[bold yellow]This file contains all data and styles embedded and can be opened directly in any browser.[/bold yellow]")
+
+    except Exception as e:
+        console.print(
+            f"[bold red]Error generating HTML dashboard: {str(e)}[/bold red]")
+
+    input("Press Enter to return to the menu...")
+
+
 @cli.command()
 def manage_issues():
     """Manage Jira issues."""
@@ -265,10 +373,12 @@ def manage_issues():
             "[bold cyan]3. Team basic stats JSON (update/display)[/bold cyan]")
         console.print(
             "[bold cyan]4. Team simple stats JSON (update/display)[/bold cyan]")
-        console.print("[bold cyan]5. Exit[/bold cyan]")
+        console.print(
+            "[bold cyan]5. Generate self-sufficient HTML dashboard[/bold cyan]")
+        console.print("[bold cyan]6. Exit[/bold cyan]")
 
         choice = console.input(
-            "[bold green]Enter your choice (1/2/3/4/5): [/bold green]")
+            "[bold green]Enter your choice (1/2/3/4/5/6): [/bold green]")
 
         if choice == '1':
             handle_issues_option()
@@ -279,6 +389,8 @@ def manage_issues():
         elif choice == '4':
             handle_developer_stats_option()
         elif choice == '5':
+            handle_html_generation_option()
+        elif choice == '6':
             console.print("[bold red]Exiting SDM Tools.[/bold red]")
             break
         else:
