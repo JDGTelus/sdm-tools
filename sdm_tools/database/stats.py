@@ -12,6 +12,32 @@ from ..config import DB_NAME, TABLE_NAME, BASIC_STATS, EXCLUDED_EMAILS
 console = Console()
 
 
+def extract_issue_code_from_watches(watches_data):
+    """Extract issue code (SET-X) from watches field JSON data."""
+    if not watches_data:
+        return None
+
+    try:
+        # Parse the JSON string
+        watches_json = json.loads(watches_data)
+
+        # Extract the 'self' URL
+        if 'self' in watches_json:
+            url = watches_json['self']
+            # Split by '/' and get the last part which should be the issue code
+            parts = url.split('/')
+            if len(parts) >= 2:
+                issue_code = parts[-1]
+                # Validate it looks like SET-X format
+                if issue_code.startswith('SET-') and issue_code.count('-') == 1:
+                    return issue_code
+    except (json.JSONDecodeError, AttributeError, TypeError) as e:
+        # If parsing fails, return None
+        pass
+
+    return None
+
+
 def backup_existing_stats_file():
     """Backup existing basic stats file if it exists."""
     if os.path.exists(BASIC_STATS):
@@ -29,15 +55,15 @@ def backup_existing_stats_file():
 
 def backup_existing_developer_stats_file():
     """Backup existing developer stats file if it exists."""
-    from ..config import STATS_FILENAME
+    from ..config import SIMPLE_STATS
 
-    if os.path.exists(STATS_FILENAME):
+    if os.path.exists(SIMPLE_STATS):
         timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
         # Ensure backup is created in the same directory as the stats file
-        stats_dir = os.path.dirname(STATS_FILENAME)
+        stats_dir = os.path.dirname(SIMPLE_STATS)
         backup_filename = os.path.join(
             stats_dir, f"team_simple_stats_backup_{timestamp}.json")
-        shutil.copy2(STATS_FILENAME, backup_filename)
+        shutil.copy2(SIMPLE_STATS, backup_filename)
         console.print(
             f"[bold yellow]Existing developer stats file backed up to: {backup_filename}[/bold yellow]")
         return backup_filename
@@ -70,7 +96,7 @@ def should_exclude_email(email):
 
 def generate_developer_stats_json():
     """Generates a JSON file with developer statistics from both Jira issues and git commits."""
-    from ..config import STATS_FILENAME
+    from ..config import SIMPLE_STATS
 
     if not os.path.exists(DB_NAME):
         console.print(
@@ -163,7 +189,7 @@ def generate_developer_stats_json():
         backup_filename = backup_existing_developer_stats_file()
 
         # Write to developer stats JSON filename
-        with open(STATS_FILENAME, 'w') as f:
+        with open(SIMPLE_STATS, 'w') as f:
             json.dump(final_json, f, indent=2, default=str)
 
         # Display summary table with cleaner format
@@ -172,18 +198,18 @@ def generate_developer_stats_json():
         # Show completion message
         if backup_filename:
             console.print(
-                f"\n[bold green]Developer statistics file created: {STATS_FILENAME}[/bold green]")
+                f"\n[bold green]Developer statistics file created: {SIMPLE_STATS}[/bold green]")
             console.print(
                 f"[bold yellow]Previous file backed up as: {backup_filename}[/bold yellow]")
         else:
             console.print(
-                f"\n[bold green]Developer statistics file created: {STATS_FILENAME}[/bold green]")
+                f"\n[bold green]Developer statistics file created: {SIMPLE_STATS}[/bold green]")
 
         try:
             input("\nPress Enter to return to the menu...")
         except EOFError:
             pass
-        return STATS_FILENAME
+        return SIMPLE_STATS
 
 
 def get_jira_stats_for_assignee(cursor, assignee):
@@ -205,10 +231,11 @@ def get_jira_stats_for_assignee(cursor, assignee):
     status_counts = dict(cursor.fetchall())
     stats["issues_by_status"] = status_counts
 
-    # Issues by priority (if priority field exists)
+    # Check what columns are available
     cursor.execute(f"PRAGMA table_info({TABLE_NAME})")
     columns = [info[1] for info in cursor.fetchall()]
 
+    # Issues by priority (if priority field exists)
     if 'priority' in columns:
         cursor.execute(f"""
             SELECT priority, COUNT(*) 
@@ -218,6 +245,57 @@ def get_jira_stats_for_assignee(cursor, assignee):
         """, (assignee,))
         priority_counts = dict(cursor.fetchall())
         stats["issues_by_priority"] = priority_counts
+
+    # Total story points (if customfield_10026 exists)
+    if 'customfield_10026' in columns:
+        cursor.execute(f"""
+            SELECT SUM(CAST(customfield_10026 AS REAL)) 
+            FROM {TABLE_NAME} 
+            WHERE assignee = ? AND customfield_10026 IS NOT NULL AND customfield_10026 != ''
+        """, (assignee,))
+        result = cursor.fetchone()[0]
+        stats["total_story_points"] = round(result, 1) if result else 0
+
+    # Story points by status (if customfield_10026 exists)
+    if 'customfield_10026' in columns:
+        cursor.execute(f"""
+            SELECT status, SUM(CAST(customfield_10026 AS REAL)) 
+            FROM {TABLE_NAME} 
+            WHERE assignee = ? AND customfield_10026 IS NOT NULL AND customfield_10026 != ''
+            GROUP BY status
+        """, (assignee,))
+        story_points_by_status = dict(cursor.fetchall())
+        # Round the values
+        stats["story_points_by_status"] = {
+            k: round(v, 1) if v else 0 for k, v in story_points_by_status.items()}
+
+    # Issues by label (if customfield_10014 exists)
+    if 'customfield_10014' in columns:
+        cursor.execute(f"""
+            SELECT customfield_10014, COUNT(*) 
+            FROM {TABLE_NAME} 
+            WHERE assignee = ? AND customfield_10014 IS NOT NULL AND customfield_10014 != ''
+            GROUP BY customfield_10014
+        """, (assignee,))
+        label_counts = dict(cursor.fetchall())
+        stats["issues_by_label"] = label_counts
+
+    # Extract issue codes from watches field (if watches field exists)
+    if 'watches' in columns:
+        cursor.execute(f"""
+            SELECT watches 
+            FROM {TABLE_NAME} 
+            WHERE assignee = ? AND watches IS NOT NULL AND watches != ''
+        """, (assignee,))
+        watches_data = cursor.fetchall()
+
+        issue_codes = []
+        for (watches_json,) in watches_data:
+            issue_code = extract_issue_code_from_watches(watches_json)
+            if issue_code:
+                issue_codes.append(issue_code)
+
+        stats["issue_codes"] = issue_codes
 
     # Average time in status (if created and updated fields exist)
     if 'created' in columns and 'updated' in columns:
@@ -437,16 +515,16 @@ def display_developer_stats_summary(developer_stats):
 
 def display_existing_stats():
     """Display existing developer statistics from the JSON file."""
-    from ..config import STATS_FILENAME
+    from ..config import SIMPLE_STATS
 
-    if not os.path.exists(STATS_FILENAME):
+    if not os.path.exists(SIMPLE_STATS):
         console.print(
-            f"[bold red]No statistics file found: {STATS_FILENAME}[/bold red]")
+            f"[bold red]No statistics file found: {SIMPLE_STATS}[/bold red]")
         input("Press Enter to return to the menu...")
         return
 
     try:
-        with open(STATS_FILENAME, 'r') as f:
+        with open(SIMPLE_STATS, 'r') as f:
             stats_data = json.load(f)
 
         developer_stats = stats_data.get("developers", {})
@@ -462,7 +540,7 @@ def display_existing_stats():
         # Show file info
         generated_at = stats_data.get("generated_at", "Unknown")
         console.print(
-            f"\n[bold green]Statistics loaded from: {STATS_FILENAME}[/bold green]")
+            f"\n[bold green]Statistics loaded from: {SIMPLE_STATS}[/bold green]")
         console.print(
             f"[bold yellow]Generated at: {generated_at}[/bold yellow]")
 
@@ -551,6 +629,11 @@ def generate_basic_stats_json():
                     "last_1_day": 0,
                     "last_3_days": 0,
                     "last_7_days": 0
+                },
+                "story_points_closed": {
+                    "last_1_day": 0,
+                    "last_3_days": 0,
+                    "last_7_days": 0
                 }
             }
 
@@ -561,6 +644,15 @@ def generate_basic_stats_json():
             # Get Jira update statistics for time periods
             jira_update_stats = get_time_based_jira_stats(cursor, assignee)
             stats["jira_updates"] = jira_update_stats
+
+            # Get story points for closed stories in time periods
+            story_points_stats = get_time_based_story_points_stats(
+                cursor, assignee)
+            stats["story_points_closed"] = story_points_stats
+
+            # Get issue codes for this assignee
+            issue_codes = get_issue_codes_for_assignee(cursor, assignee)
+            stats["issue_codes"] = issue_codes
 
             developer_basic_stats[assignee] = stats
 
@@ -720,6 +812,101 @@ def get_time_based_jira_stats(cursor, assignee):
     return stats
 
 
+def get_time_based_story_points_stats(cursor, assignee):
+    """Get story points statistics for closed stories in specific time periods."""
+    from datetime import datetime, timedelta
+
+    stats = {
+        "last_1_day": 0,
+        "last_3_days": 0,
+        "last_7_days": 0
+    }
+
+    # Check if required columns exist
+    cursor.execute(f"PRAGMA table_info({TABLE_NAME})")
+    columns = [info[1] for info in cursor.fetchall()]
+
+    if 'customfield_10026' not in columns or 'updated' not in columns or 'status' not in columns:
+        return stats
+
+    # Calculate date thresholds
+    now = datetime.now()
+    one_day_ago = (now - timedelta(days=1)).isoformat()
+    three_days_ago = (now - timedelta(days=3)).isoformat()
+    seven_days_ago = (now - timedelta(days=7)).isoformat()
+
+    # Common "closed" status indicators
+    closed_statuses = ["Done", "Closed", "Resolved", "Complete", "Completed"]
+    status_placeholders = ','.join(['?' for _ in closed_statuses])
+
+    # Last 1 day - sum of story points for closed stories
+    cursor.execute(f"""
+        SELECT SUM(CAST(customfield_10026 AS REAL)) 
+        FROM {TABLE_NAME} 
+        WHERE assignee = ? 
+        AND updated >= ? 
+        AND status IN ({status_placeholders})
+        AND customfield_10026 IS NOT NULL 
+        AND customfield_10026 != ''
+    """, (assignee, one_day_ago, *closed_statuses))
+    result = cursor.fetchone()[0]
+    stats["last_1_day"] = round(result, 1) if result else 0
+
+    # Last 3 days
+    cursor.execute(f"""
+        SELECT SUM(CAST(customfield_10026 AS REAL)) 
+        FROM {TABLE_NAME} 
+        WHERE assignee = ? 
+        AND updated >= ? 
+        AND status IN ({status_placeholders})
+        AND customfield_10026 IS NOT NULL 
+        AND customfield_10026 != ''
+    """, (assignee, three_days_ago, *closed_statuses))
+    result = cursor.fetchone()[0]
+    stats["last_3_days"] = round(result, 1) if result else 0
+
+    # Last 7 days
+    cursor.execute(f"""
+        SELECT SUM(CAST(customfield_10026 AS REAL)) 
+        FROM {TABLE_NAME} 
+        WHERE assignee = ? 
+        AND updated >= ? 
+        AND status IN ({status_placeholders})
+        AND customfield_10026 IS NOT NULL 
+        AND customfield_10026 != ''
+    """, (assignee, seven_days_ago, *closed_statuses))
+    result = cursor.fetchone()[0]
+    stats["last_7_days"] = round(result, 1) if result else 0
+
+    return stats
+
+
+def get_issue_codes_for_assignee(cursor, assignee):
+    """Get issue codes for a specific assignee from the watches field."""
+    # Check if watches column exists
+    cursor.execute(f"PRAGMA table_info({TABLE_NAME})")
+    columns = [info[1] for info in cursor.fetchall()]
+
+    if 'watches' not in columns:
+        return []
+
+    # Get watches data for this assignee
+    cursor.execute(f"""
+        SELECT watches 
+        FROM {TABLE_NAME} 
+        WHERE assignee = ? AND watches IS NOT NULL AND watches != ''
+    """, (assignee,))
+    watches_data = cursor.fetchall()
+
+    issue_codes = []
+    for (watches_json,) in watches_data:
+        issue_code = extract_issue_code_from_watches(watches_json)
+        if issue_code:
+            issue_codes.append(issue_code)
+
+    return issue_codes
+
+
 def display_basic_stats_summary(developer_basic_stats):
     """Display a summary table of basic developer statistics."""
     table = Table(show_header=True, header_style="bold green")
@@ -731,6 +918,9 @@ def display_basic_stats_summary(developer_basic_stats):
     table.add_column("Jira Updates (1d)")
     table.add_column("Jira Updates (3d)")
     table.add_column("Jira Updates (7d)")
+    table.add_column("Story Points (1d)")
+    table.add_column("Story Points (3d)")
+    table.add_column("Story Points (7d)")
 
     for assignee_json, stats in developer_basic_stats.items():
         # Extract clean name and email for display
@@ -744,7 +934,10 @@ def display_basic_stats_summary(developer_basic_stats):
             str(stats["commits"]["last_7_days"]),
             str(stats["jira_updates"]["last_1_day"]),
             str(stats["jira_updates"]["last_3_days"]),
-            str(stats["jira_updates"]["last_7_days"])
+            str(stats["jira_updates"]["last_7_days"]),
+            str(stats["story_points_closed"]["last_1_day"]),
+            str(stats["story_points_closed"]["last_3_days"]),
+            str(stats["story_points_closed"]["last_7_days"])
         )
 
     console.print(

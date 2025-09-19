@@ -148,10 +148,10 @@ def handle_developer_stats_option():
     """Handle the developer stats option (display or generate JSON with stats)."""
     import os
     from .database.stats import display_existing_stats
-    from .config import STATS_FILENAME
+    from .config import SIMPLE_STATS
 
     # Check if stats file already exists
-    if os.path.exists(STATS_FILENAME):
+    if os.path.exists(SIMPLE_STATS):
         # Data exists, ask if user wants to update or just display
         update_choice = console.input(
             "[bold yellow]Developer statistics file already exists. Do you want to update it? (y/N): [/bold yellow]").strip().lower()

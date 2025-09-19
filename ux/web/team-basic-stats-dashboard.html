@@ -176,6 +176,8 @@
             const email = extractEmail(developer.name);
             const commits = developer.commits || {};
             const jiraUpdates = developer.jira_updates || {};
+            const storyPointsClosed = developer.story_points_closed || {};
+            const issueCodes = developer.issue_codes || [];
 
             // Calculate total activity for the week
             const totalCommits7d = commits.last_7_days || 0;
@@ -199,6 +201,28 @@
                             {totalActivity}
                         </div>
                     </div>
+                    
+                    {/* Issue Codes Section */}
+                    {issueCodes.length > 0 && (
+                        <div className="mb-4">
+                            <h4 className="text-sm font-semibold text-gray-700 mb-2 flex items-center">
+                                <span className="text-telus-purple mr-2">🎫</span>
+                                Issue Codes
+                            </h4>
+                            <div className="flex flex-wrap gap-1">
+                                {issueCodes.slice(0, 6).map((code, index) => (
+                                    <span key={index} className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
+                                        {code}
+                                    </span>
+                                ))}
+                                {issueCodes.length > 6 && (
+                                    <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-600">
+                                        +{issueCodes.length - 6} more
+                                    </span>
+                                )}
+                            </div>
+                        </div>
+                    )}
                     
                     {/* Commits Section */}
                     <div className="mb-4">
@@ -239,6 +263,28 @@
                             </div>
                             <div className="text-center bg-blue-50 rounded-lg p-2">
                                 <p className="text-lg font-bold text-telus-blue">{jiraUpdates.last_7_days || 0}</p>
+                                <p className="text-xs text-gray-600">7 days</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Story Points Closed Section */}
+                    <div className="mb-4">
+                        <h4 className="text-sm font-semibold text-gray-700 mb-2 flex items-center">
+                            <span className="text-orange-500 mr-2">⭐</span>
+                            Story Points Closed
+                        </h4>
+                        <div className="grid grid-cols-3 gap-2">
+                            <div className="text-center bg-orange-50 rounded-lg p-2">
+                                <p className="text-lg font-bold text-orange-600">{storyPointsClosed.last_1_day || 0}</p>
+                                <p className="text-xs text-gray-600">1 day</p>
+                            </div>
+                            <div className="text-center bg-orange-50 rounded-lg p-2">
+                                <p className="text-lg font-bold text-orange-600">{storyPointsClosed.last_3_days || 0}</p>
+                                <p className="text-xs text-gray-600">3 days</p>
+                            </div>
+                            <div className="text-center bg-orange-50 rounded-lg p-2">
+                                <p className="text-lg font-bold text-orange-600">{storyPointsClosed.last_7_days || 0}</p>
                                 <p className="text-xs text-gray-600">7 days</p>
                             </div>
                         </div>
