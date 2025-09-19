@@ -250,20 +250,15 @@ def handle_basic_stats_option():
 
 
 def handle_html_generation_option():
-    """Handle the HTML generation option - creates a self-sufficient HTML dashboard."""
+    """Handle the HTML generation option - creates self-sufficient HTML dashboards for all HTML files in ux/web."""
     import json
+    import glob
     from datetime import datetime
     import shutil
+    from .config import SIMPLE_STATS
 
     console.print(
-        "[bold yellow]Generating self-sufficient HTML dashboard...[/bold yellow]")
-
-    # Check if basic stats JSON exists
-    if not BASIC_STATS or not os.path.exists(BASIC_STATS):
-        console.print(
-            f"[bold red]Basic statistics file not found at {BASIC_STATS}. Please generate it first using option 3.[/bold red]")
-        input("Press Enter to return to the menu...")
-        return
+        "[bold yellow]Generating self-sufficient HTML dashboards...[/bold yellow]")
 
     try:
         # Create dist directory
@@ -273,23 +268,7 @@ def handle_html_generation_option():
             console.print(
                 f"[bold green]Created {dist_dir} directory.[/bold green]")
 
-        # Define the target filename
-        target_file = os.path.join(dist_dir, "team-basic-stats-dashboard.html")
-
-        # If target file exists, create a timestamped backup
-        if os.path.exists(target_file):
-            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            backup_file = os.path.join(
-                dist_dir, f"team-basic-stats-dashboard_{timestamp}.html")
-            shutil.move(target_file, backup_file)
-            console.print(
-                f"[bold yellow]Existing file backed up as: {backup_file}[/bold yellow]")
-
-        # Read the JSON data
-        with open(BASIC_STATS, 'r', encoding='utf-8') as f:
-            json_data = json.load(f)
-
-        # Read the CSS file
+        # Read the CSS file once
         css_file = "ux/web/shared-dashboard-styles.css"
         if not os.path.exists(css_file):
             console.print(
@@ -300,59 +279,118 @@ def handle_html_generation_option():
         with open(css_file, 'r', encoding='utf-8') as f:
             css_content = f.read()
 
-        # Read the HTML template
-        html_file = "ux/web/team-basic-stats-dashboard.html"
-        if not os.path.exists(html_file):
+        # Find all HTML files in ux/web directory
+        html_files = glob.glob("ux/web/*.html")
+
+        if not html_files:
             console.print(
-                f"[bold red]HTML file not found at {html_file}.[/bold red]")
+                "[bold red]No HTML files found in ux/web directory.[/bold red]")
             input("Press Enter to return to the menu...")
             return
 
-        with open(html_file, 'r', encoding='utf-8') as f:
-            html_content = f.read()
+        generated_files = []
 
-        # Replace the CSS import with inline styles
-        inline_css = f'<style>\n{css_content}\n</style>'
-        html_content = html_content.replace(
-            '<link rel="stylesheet" href="shared-dashboard-styles.css">', inline_css)
+        for html_file in html_files:
+            try:
+                # Extract filename without path
+                filename = os.path.basename(html_file)
+                console.print(
+                    f"[bold cyan]Processing {filename}...[/bold cyan]")
 
-        # Replace the fetch call with embedded data
-        # Use more indentation for readability
-        json_str = json.dumps(json_data, indent=8)
+                # Determine which JSON file to use based on HTML filename
+                if "basic" in filename.lower():
+                    if not BASIC_STATS or not os.path.exists(BASIC_STATS):
+                        console.print(
+                            f"[bold yellow]Skipping {filename} - Basic statistics file not found at {BASIC_STATS}.[/bold yellow]")
+                        continue
+                    json_file = BASIC_STATS
+                elif "simple" in filename.lower():
+                    if not SIMPLE_STATS or not os.path.exists(SIMPLE_STATS):
+                        console.print(
+                            f"[bold yellow]Skipping {filename} - Simple statistics file not found at {SIMPLE_STATS}.[/bold yellow]")
+                        continue
+                    json_file = SIMPLE_STATS
+                else:
+                    console.print(
+                        f"[bold yellow]Skipping {filename} - Cannot determine which JSON file to use.[/bold yellow]")
+                    continue
 
-        # Find the useEffect block and replace the entire fetch logic
-        useEffect_start = html_content.find("useEffect(() => {")
-        if useEffect_start != -1:
-            # Find the end of the useEffect block
-            useEffect_end = html_content.find("}, []);", useEffect_start)
-            if useEffect_end != -1:
-                useEffect_end += len("}, []);")
+                # Define the target filename
+                target_file = os.path.join(dist_dir, filename)
 
-                # Create the new useEffect content with embedded data
-                new_useEffect = f"""useEffect(() => {{
+                # If target file exists, create a timestamped backup
+                if os.path.exists(target_file):
+                    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                    backup_file = os.path.join(
+                        dist_dir, f"{os.path.splitext(filename)[0]}_{timestamp}.html")
+                    shutil.move(target_file, backup_file)
+                    console.print(
+                        f"[bold yellow]Existing file backed up as: {backup_file}[/bold yellow]")
+
+                # Read the JSON data
+                with open(json_file, 'r', encoding='utf-8') as f:
+                    json_data = json.load(f)
+
+                # Read the HTML template
+                with open(html_file, 'r', encoding='utf-8') as f:
+                    html_content = f.read()
+
+                # Replace the CSS import with inline styles
+                inline_css = f'<style>\n{css_content}\n</style>'
+                html_content = html_content.replace(
+                    '<link rel="stylesheet" href="shared-dashboard-styles.css">', inline_css)
+
+                # Replace the fetch call with embedded data
+                # Use more indentation for readability
+                json_str = json.dumps(json_data, indent=8)
+
+                # Find the useEffect block and replace the entire fetch logic
+                useEffect_start = html_content.find("useEffect(() => {")
+                if useEffect_start != -1:
+                    # Find the end of the useEffect block
+                    useEffect_end = html_content.find(
+                        "}, []);", useEffect_start)
+                    if useEffect_end != -1:
+                        useEffect_end += len("}, []);")
+
+                        # Create the new useEffect content with embedded data
+                        new_useEffect = f"""useEffect(() => {{
             // Data embedded directly in the HTML
             setTeamData({json_str});
             setLoading(false);
         }}, []);"""
 
-                # Replace the entire useEffect block
-                html_content = (html_content[:useEffect_start] +
-                                new_useEffect +
-                                html_content[useEffect_end:])
+                        # Replace the entire useEffect block
+                        html_content = (html_content[:useEffect_start] +
+                                        new_useEffect +
+                                        html_content[useEffect_end:])
 
-        # Write the combined HTML file
-        with open(target_file, 'w', encoding='utf-8') as f:
-            f.write(html_content)
+                # Write the combined HTML file
+                with open(target_file, 'w', encoding='utf-8') as f:
+                    f.write(html_content)
 
-        console.print(
-            f"[bold green]Self-sufficient HTML dashboard generated successfully![/bold green]")
-        console.print(f"[bold cyan]File saved as: {target_file}[/bold cyan]")
-        console.print(
-            f"[bold yellow]This file contains all data and styles embedded and can be opened directly in any browser.[/bold yellow]")
+                generated_files.append(target_file)
+                console.print(
+                    f"[bold green]✓ Generated: {target_file}[/bold green]")
+
+            except Exception as e:
+                console.print(
+                    f"[bold red]Error processing {filename}: {str(e)}[/bold red]")
+
+        if generated_files:
+            console.print(
+                f"[bold green]Successfully generated {len(generated_files)} self-sufficient HTML dashboard(s)![/bold green]")
+            for file in generated_files:
+                console.print(f"[bold cyan]  • {file}[/bold cyan]")
+            console.print(
+                f"[bold yellow]These files contain all data and styles embedded and can be opened directly in any browser.[/bold yellow]")
+        else:
+            console.print(
+                "[bold red]No dashboards were generated. Please ensure JSON data files exist.[/bold red]")
 
     except Exception as e:
         console.print(
-            f"[bold red]Error generating HTML dashboard: {str(e)}[/bold red]")
+            f"[bold red]Error generating HTML dashboards: {str(e)}[/bold red]")
 
     input("Press Enter to return to the menu...")
 
