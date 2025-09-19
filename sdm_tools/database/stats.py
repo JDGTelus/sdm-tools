@@ -599,6 +599,7 @@ def generate_basic_stats_json():
 def get_time_based_commit_stats(cursor, assignee):
     """Get commit statistics for specific time periods."""
     from datetime import datetime, timedelta
+    import re
 
     stats = {
         "last_1_day": 0,
@@ -618,47 +619,55 @@ def get_time_based_commit_stats(cursor, assignee):
 
     # Calculate date thresholds
     now = datetime.now()
-    one_day_ago = (now - timedelta(days=1)).strftime('%Y-%m-%d')
-    three_days_ago = (now - timedelta(days=3)).strftime('%Y-%m-%d')
-    seven_days_ago = (now - timedelta(days=7)).strftime('%Y-%m-%d')
+    one_day_ago = now - timedelta(days=1)
+    three_days_ago = now - timedelta(days=3)
+    seven_days_ago = now - timedelta(days=7)
 
-    # Search patterns for matching commits
-    search_patterns = []
+    # Get all commits for this assignee first, then filter by date
+    search_conditions = []
+    search_params = []
+
     if assignee_email:
-        search_patterns.append(assignee_email)
+        search_conditions.append("author_email = ?")
+        search_params.append(assignee_email)
     if assignee_name:
-        search_patterns.append(assignee_name)
+        search_conditions.append("author_name = ?")
+        search_params.append(assignee_name)
 
-    for pattern in search_patterns:
-        # Last 1 day
-        cursor.execute("""
-            SELECT COUNT(*) 
-            FROM git_commits 
-            WHERE (author_name LIKE ? OR author_email LIKE ?) 
-            AND date >= ?
-        """, (f"%{pattern}%", f"%{pattern}%", one_day_ago))
-        count = cursor.fetchone()[0]
-        stats["last_1_day"] += count
+    if not search_conditions:
+        return stats
 
-        # Last 3 days
-        cursor.execute("""
-            SELECT COUNT(*) 
-            FROM git_commits 
-            WHERE (author_name LIKE ? OR author_email LIKE ?) 
-            AND date >= ?
-        """, (f"%{pattern}%", f"%{pattern}%", three_days_ago))
-        count = cursor.fetchone()[0]
-        stats["last_3_days"] += count
+    # Use OR to combine conditions, but avoid double counting
+    where_clause = " OR ".join(search_conditions)
 
-        # Last 7 days
-        cursor.execute("""
-            SELECT COUNT(*) 
-            FROM git_commits 
-            WHERE (author_name LIKE ? OR author_email LIKE ?) 
-            AND date >= ?
-        """, (f"%{pattern}%", f"%{pattern}%", seven_days_ago))
-        count = cursor.fetchone()[0]
-        stats["last_7_days"] += count
+    cursor.execute(f"""
+        SELECT DISTINCT date 
+        FROM git_commits 
+        WHERE {where_clause}
+    """, search_params)
+
+    commit_dates = cursor.fetchall()
+
+    for (date_str,) in commit_dates:
+        try:
+            # Parse git date format: "Wed Sep 17 23:37:12 2025 +0000"
+            # Remove timezone info and parse
+            date_clean = re.sub(r'\s+[+-]\d{4}$', '', date_str)
+            commit_date = datetime.strptime(date_clean, '%a %b %d %H:%M:%S %Y')
+
+            # Count commits for each time period
+            if commit_date >= one_day_ago:
+                stats["last_1_day"] += 1
+            if commit_date >= three_days_ago:
+                stats["last_3_days"] += 1
+            if commit_date >= seven_days_ago:
+                stats["last_7_days"] += 1
+
+        except (ValueError, AttributeError) as e:
+            # Skip commits with unparseable dates
+            console.print(
+                f"[bold yellow]Warning: Could not parse date '{date_str}': {e}[/bold yellow]")
+            continue
 
     return stats
 
