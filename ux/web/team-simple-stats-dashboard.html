@@ -207,7 +207,7 @@
 
             useEffect(() => {
                 // Simulate loading the JSON data
-                fetch('./team_simple_stats.json')
+                fetch('./data/team_simple_stats.json')
                     .then(response => response.json())
                     .then(data => {
                         setTeamData(data);

@@ -7,19 +7,39 @@ from datetime import datetime
 from collections import defaultdict
 from rich.console import Console
 from rich.table import Table
-from ..config import DB_NAME, TABLE_NAME, STATS_FILENAME, EXCLUDED_EMAILS
+from ..config import DB_NAME, TABLE_NAME, BASIC_STATS, EXCLUDED_EMAILS
 
 console = Console()
 
 
 def backup_existing_stats_file():
-    """Backup existing stats file if it exists."""
+    """Backup existing basic stats file if it exists."""
+    if os.path.exists(BASIC_STATS):
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        # Ensure backup is created in the same directory as the stats file
+        stats_dir = os.path.dirname(BASIC_STATS)
+        backup_filename = os.path.join(
+            stats_dir, f"team_basic_stats_backup_{timestamp}.json")
+        shutil.copy2(BASIC_STATS, backup_filename)
+        console.print(
+            f"[bold yellow]Existing basic stats file backed up to: {backup_filename}[/bold yellow]")
+        return backup_filename
+    return None
+
+
+def backup_existing_developer_stats_file():
+    """Backup existing developer stats file if it exists."""
+    from ..config import STATS_FILENAME
+
     if os.path.exists(STATS_FILENAME):
         timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-        backup_filename = f"team_simple_stats_backup_{timestamp}.json"
+        # Ensure backup is created in the same directory as the stats file
+        stats_dir = os.path.dirname(STATS_FILENAME)
+        backup_filename = os.path.join(
+            stats_dir, f"team_simple_stats_backup_{timestamp}.json")
         shutil.copy2(STATS_FILENAME, backup_filename)
         console.print(
-            f"[bold yellow]Existing stats file backed up to: {backup_filename}[/bold yellow]")
+            f"[bold yellow]Existing developer stats file backed up to: {backup_filename}[/bold yellow]")
         return backup_filename
     return None
 
@@ -50,6 +70,8 @@ def should_exclude_email(email):
 
 def generate_developer_stats_json():
     """Generates a JSON file with developer statistics from both Jira issues and git commits."""
+    from ..config import STATS_FILENAME
+
     if not os.path.exists(DB_NAME):
         console.print(
             "[bold red]Database does not exist. Please update issues and commits first.[/bold red]")
@@ -138,9 +160,9 @@ def generate_developer_stats_json():
         }
 
         # Backup existing file if it exists
-        backup_filename = backup_existing_stats_file()
+        backup_filename = backup_existing_developer_stats_file()
 
-        # Write to fixed JSON filename
+        # Write to developer stats JSON filename
         with open(STATS_FILENAME, 'w') as f:
             json.dump(final_json, f, indent=2, default=str)
 
@@ -412,6 +434,8 @@ def display_developer_stats_summary(developer_stats):
 
 def display_existing_stats():
     """Display existing developer statistics from the JSON file."""
+    from ..config import STATS_FILENAME
+
     if not os.path.exists(STATS_FILENAME):
         console.print(
             f"[bold red]No statistics file found: {STATS_FILENAME}[/bold red]")
@@ -449,7 +473,7 @@ def display_existing_stats():
 
 def generate_basic_stats_json():
     """Generates a JSON file with basic time-based developer statistics."""
-    from ..config import BASIC_FILENAME
+    from ..config import BASIC_STATS
 
     if not os.path.exists(DB_NAME):
         console.print(
@@ -538,15 +562,18 @@ def generate_basic_stats_json():
         }
 
         # Backup existing file if it exists
-        if os.path.exists(BASIC_FILENAME):
+        if os.path.exists(BASIC_STATS):
             timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-            backup_filename = f"{BASIC_FILENAME.replace('.json', '')}_backup_{timestamp}.json"
-            shutil.copy2(BASIC_FILENAME, backup_filename)
+            # Ensure backup is created in the same directory as the basic stats file
+            basic_stats_dir = os.path.dirname(BASIC_STATS)
+            backup_filename = os.path.join(
+                basic_stats_dir, f"{os.path.basename(BASIC_STATS).replace('.json', '')}_backup_{timestamp}.json")
+            shutil.copy2(BASIC_STATS, backup_filename)
             console.print(
                 f"[bold yellow]Existing basic stats file backed up to: {backup_filename}[/bold yellow]")
 
         # Write to basic stats JSON filename
-        with open(BASIC_FILENAME, 'w') as f:
+        with open(BASIC_STATS, 'w') as f:
             json.dump(final_json, f, indent=2, default=str)
 
         # Display summary table
@@ -554,10 +581,10 @@ def generate_basic_stats_json():
 
         # Show completion message
         console.print(
-            f"\n[bold green]Basic statistics file created: {BASIC_FILENAME}[/bold green]")
+            f"\n[bold green]Basic statistics file created: {BASIC_STATS}[/bold green]")
 
         input("\nPress Enter to return to the menu...")
-        return BASIC_FILENAME
+        return BASIC_STATS
 
 
 def get_time_based_commit_stats(cursor, assignee):
@@ -709,16 +736,16 @@ def display_basic_stats_summary(developer_basic_stats):
 
 def display_existing_basic_stats():
     """Display existing basic developer statistics from the JSON file."""
-    from ..config import BASIC_FILENAME
+    from ..config import BASIC_STATS
 
-    if not os.path.exists(BASIC_FILENAME):
+    if not os.path.exists(BASIC_STATS):
         console.print(
-            f"[bold red]No basic statistics file found: {BASIC_FILENAME}[/bold red]")
+            f"[bold red]No basic statistics file found: {BASIC_STATS}[/bold red]")
         input("Press Enter to return to the menu...")
         return
 
     try:
-        with open(BASIC_FILENAME, 'r') as f:
+        with open(BASIC_STATS, 'r') as f:
             stats_data = json.load(f)
 
         developer_stats = stats_data.get("developers", {})
@@ -734,7 +761,7 @@ def display_existing_basic_stats():
         # Show file info
         generated_at = stats_data.get("generated_at", "Unknown")
         console.print(
-            f"\n[bold green]Basic statistics loaded from: {BASIC_FILENAME}[/bold green]")
+            f"\n[bold green]Basic statistics loaded from: {BASIC_STATS}[/bold green]")
         console.print(
             f"[bold yellow]Generated at: {generated_at}[/bold yellow]")
 

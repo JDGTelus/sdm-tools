@@ -66,7 +66,7 @@ Set the following environment variables for configuration:
 #### Optional Variables (with defaults)
 - `DB_NAME`: Name of the SQLite database file (default: `sdm_tools.db`)
 - `TABLE_NAME`: Name of the table to store issues (default: `iotmi_3p_issues`)
-- `STATS_FILENAME`: Name of the team statistics JSON file (default: `team_simple_stats.json`)
+- `BASIC_STATS`: Name of the team statistics JSON file (default: `team_simple_stats.json`)
 
 #### Additional Variables
 - `REPO_NAME`: Name of the repository for reference (e.g., `your-repo-name`)
@@ -84,7 +84,7 @@ export DB_NAME='sdm_tools.db'
 export TABLE_NAME='iotmi_3p_issues'
 export REPO_PATH='/path/to/repo'
 export REPO_NAME='your-repo-name'
-export STATS_FILENAME='team_simple_stats.json'
+export BASIC_STATS='team_simple_stats.json'
 ```
 
 ## Usage

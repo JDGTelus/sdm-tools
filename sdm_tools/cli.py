@@ -9,7 +9,7 @@ from .database import (
     generate_developer_stats_json
 )
 from .database.stats import generate_basic_stats_json, display_existing_basic_stats
-from .config import DB_NAME, TABLE_NAME, BASIC_FILENAME
+from .config import DB_NAME, TABLE_NAME, BASIC_STATS
 
 
 @click.group(invoke_without_command=True)
@@ -147,7 +147,8 @@ def handle_commits_option():
 def handle_developer_stats_option():
     """Handle the developer stats option (display or generate JSON with stats)."""
     import os
-    from .database.stats import STATS_FILENAME, display_existing_stats
+    from .database.stats import display_existing_stats
+    from .config import STATS_FILENAME
 
     # Check if stats file already exists
     if os.path.exists(STATS_FILENAME):
@@ -195,17 +196,17 @@ def handle_developer_stats_option():
 
 def handle_basic_stats_option():
     """Handle the basic stats option (display or generate JSON with time-based stats)."""
-    if not BASIC_FILENAME:
+    if not BASIC_STATS:
         console.print(
             "[bold red]BASIC_STATS environment variable is not set. Please configure it in your .env file.[/bold red]")
         input("Press Enter to return to the menu...")
         return
 
     # Check if basic stats file already exists
-    if os.path.exists(BASIC_FILENAME):
+    if os.path.exists(BASIC_STATS):
         # Data exists, ask if user wants to update or just display
         update_choice = console.input(
-            f"[bold yellow]Basic statistics file ({BASIC_FILENAME}) already exists. Do you want to update it? (y/N): [/bold yellow]").strip().lower()
+            f"[bold yellow]Basic statistics file ({BASIC_STATS}) already exists. Do you want to update it? (y/N): [/bold yellow]").strip().lower()
 
         if update_choice == 'y' or update_choice == 'yes':
             # User wants to update
@@ -232,7 +233,7 @@ def handle_basic_stats_option():
     else:
         # No data exists, generate it
         console.print(
-            f"[bold yellow]No basic statistics file found ({BASIC_FILENAME}). Generating from Jira issues and git commits...[/bold yellow]")
+            f"[bold yellow]No basic statistics file found ({BASIC_STATS}). Generating from Jira issues and git commits...[/bold yellow]")
         try:
             json_filename = generate_basic_stats_json()
             if not json_filename:
