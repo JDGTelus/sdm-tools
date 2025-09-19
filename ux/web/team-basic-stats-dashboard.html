@@ -408,6 +408,20 @@
                                 📊 Activity Overview
                             </h2>
                             <DeveloperTable developers={developers} />
+                            
+                            {/* Table Explanation */}
+                            <div className="mt-8 bg-gradient-to-r from-blue-50 to-purple-50 rounded-xl p-6 border-l-4 border-telus-blue">
+                                <h3 className="text-lg font-semibold text-gray-800 mb-3 flex items-center">
+                                    <span className="text-telus-blue mr-2">📋</span>
+                                    Activity Metrics Explanation
+                                </h3>
+                                <div className="text-sm text-gray-700 space-y-2">
+                                    <p><strong>Commits:</strong> Git repository commits authored by each developer within the specified time windows (1, 3, 7 days).</p>
+                                    <p><strong>Jira Updates:</strong> Frequency of issue modifications including status changes, comments, and field updates within temporal boundaries.</p>
+                                    <p><strong>Story Points:</strong> Aggregate estimation units for completed user stories transitioned to 'Done' status within each time period.</p>
+                                    <p><strong>Issue Codes:</strong> Unique project identifiers extracted from Jira issue keys associated with developer activity.</p>
+                                </div>
+                            </div>
                         </div>
 
                         {/* Developer Cards */}

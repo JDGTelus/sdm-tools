@@ -318,6 +318,20 @@
                                     />
                                 ))}
                             </div>
+                            
+                            {/* Top Performers Calculation Explanation */}
+                            <div className="mt-8 bg-gradient-to-r from-yellow-50 to-orange-50 rounded-xl p-6 border-l-4 border-yellow-500">
+                                <h3 className="text-lg font-semibold text-gray-800 mb-3 flex items-center">
+                                    <span className="text-yellow-600 mr-2">🏆</span>
+                                    Productivity Score Calculation
+                                </h3>
+                                <div className="text-sm text-gray-700 space-y-2">
+                                    <p><strong>Formula:</strong> Productivity Score = (Total Commits × 10) + (Total Issues × 15) + Velocity Bonus</p>
+                                    <p><strong>Velocity Bonus:</strong> Additional points awarded for maintaining consistent commit-to-issue ratios above baseline thresholds.</p>
+                                    <p><strong>Ranking:</strong> Developers are ranked in descending order by productivity score, with ties broken by total commits.</p>
+                                    <p><strong>Normalization:</strong> Scores are calculated over the entire data collection period to ensure temporal consistency.</p>
+                                </div>
+                            </div>
                         </div>
 
                         {/* All Developers */}
@@ -333,6 +347,20 @@
                                         developerKey={key} 
                                     />
                                 ))}
+                            </div>
+                            
+                            {/* Developer Metrics Explanation */}
+                            <div className="mt-8 bg-gradient-to-r from-green-50 to-blue-50 rounded-xl p-6 border-l-4 border-telus-green">
+                                <h3 className="text-lg font-semibold text-gray-800 mb-3 flex items-center">
+                                    <span className="text-telus-green mr-2">📊</span>
+                                    Developer Metrics Explanation
+                                </h3>
+                                <div className="text-sm text-gray-700 space-y-2">
+                                    <p><strong>Productivity Score:</strong> Composite metric derived from commit frequency, issue resolution rate, and velocity consistency.</p>
+                                    <p><strong>C/I Ratio:</strong> Commits-to-Issues ratio indicating development granularity and code iteration patterns.</p>
+                                    <p><strong>Story Points:</strong> Cumulative estimation units for all assigned issues, reflecting workload complexity and scope.</p>
+                                    <p><strong>Progress Bar:</strong> Visual representation of productivity score relative to team maximum (400-point scale).</p>
+                                </div>
                             </div>
                         </div>
 
