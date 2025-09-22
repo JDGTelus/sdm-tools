@@ -108,24 +108,18 @@
                             <tr>
                                 <th className="px-6 py-4 text-left text-sm font-semibold">Developer</th>
                                 <th className="px-6 py-4 text-left text-sm font-semibold">Email</th>
-                                <th className="px-6 py-4 text-center text-sm font-semibold">Commits (1d)</th>
-                                <th className="px-6 py-4 text-center text-sm font-semibold">Commits (3d)</th>
-                                <th className="px-6 py-4 text-center text-sm font-semibold">Commits (7d)</th>
-                                <th className="px-6 py-4 text-center text-sm font-semibold">Jira Updates (1d)</th>
-                                <th className="px-6 py-4 text-center text-sm font-semibold">Jira Updates (3d)</th>
-                                <th className="px-6 py-4 text-center text-sm font-semibold">Jira Updates (7d)</th>
-                                <th className="px-6 py-4 text-center text-sm font-semibold">Story Points (1d)</th>
-                                <th className="px-6 py-4 text-center text-sm font-semibold">Story Points (3d)</th>
-                                <th className="px-6 py-4 text-center text-sm font-semibold">Story Points (7d)</th>
+                                <th className="px-6 py-4 text-center text-sm font-semibold">Total Commits</th>
+                                <th className="px-6 py-4 text-center text-sm font-semibold">Total Jira Updates</th>
+                                <th className="px-6 py-4 text-center text-sm font-semibold">Total Story Points Closed</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-gray-200">
                             {developers.map(([key, developer], index) => {
                                 const displayName = extractDisplayName(developer.name);
                                 const email = extractEmail(developer.name);
-                                const commits = developer.commits || {};
-                                const jiraUpdates = developer.jira_updates || {};
-                                const storyPointsClosed = developer.story_points_closed || {};
+                                const totalCommits = developer.total_commits || 0;
+                                const totalJiraUpdates = developer.total_jira_updates || 0;
+                                const totalStoryPointsClosed = developer.total_story_points_closed || 0;
                                 
                                 return (
                                     <tr key={key} className={`${index % 2 === 0 ? 'bg-gray-50' : 'bg-white'} hover:bg-blue-50 transition-colors`}>
@@ -137,47 +131,17 @@
                                         </td>
                                         <td className="px-6 py-4 text-center">
                                             <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                                                {commits.last_1_day || 0}
-                                            </span>
-                                        </td>
-                                        <td className="px-6 py-4 text-center">
-                                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                                                {commits.last_3_days || 0}
-                                            </span>
-                                        </td>
-                                        <td className="px-6 py-4 text-center">
-                                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                                                {commits.last_7_days || 0}
+                                                {totalCommits}
                                             </span>
                                         </td>
                                         <td className="px-6 py-4 text-center">
                                             <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                                                {jiraUpdates.last_1_day || 0}
-                                            </span>
-                                        </td>
-                                        <td className="px-6 py-4 text-center">
-                                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                                                {jiraUpdates.last_3_days || 0}
-                                            </span>
-                                        </td>
-                                        <td className="px-6 py-4 text-center">
-                                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                                                {jiraUpdates.last_7_days || 0}
+                                                {totalJiraUpdates}
                                             </span>
                                         </td>
                                         <td className="px-6 py-4 text-center">
                                             <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-orange-100 text-orange-800">
-                                                {storyPointsClosed.last_1_day || 0}
-                                            </span>
-                                        </td>
-                                        <td className="px-6 py-4 text-center">
-                                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-orange-100 text-orange-800">
-                                                {storyPointsClosed.last_3_days || 0}
-                                            </span>
-                                        </td>
-                                        <td className="px-6 py-4 text-center">
-                                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-orange-100 text-orange-800">
-                                                {storyPointsClosed.last_7_days || 0}
+                                                {totalStoryPointsClosed}
                                             </span>
                                         </td>
                                     </tr>
@@ -193,19 +157,17 @@
         const DeveloperCard = ({ developer, developerKey }) => {
             const displayName = extractDisplayName(developer.name);
             const email = extractEmail(developer.name);
-            const commits = developer.commits || {};
-            const jiraUpdates = developer.jira_updates || {};
-            const storyPointsClosed = developer.story_points_closed || {};
+            const totalCommits = developer.total_commits || 0;
+            const totalJiraUpdates = developer.total_jira_updates || 0;
+            const totalStoryPointsClosed = developer.total_story_points_closed || 0;
             const issueCodes = developer.issue_codes || [];
 
-            // Calculate total activity for the week
-            const totalCommits7d = commits.last_7_days || 0;
-            const totalJiraUpdates7d = jiraUpdates.last_7_days || 0;
-            const totalActivity = totalCommits7d + totalJiraUpdates7d;
+            // Calculate total activity
+            const totalActivity = totalCommits + totalJiraUpdates;
 
             const getActivityColor = (activity) => {
-                if (activity >= 10) return 'text-green-600';
-                if (activity >= 5) return 'text-yellow-600';
+                if (activity >= 20) return 'text-green-600';
+                if (activity >= 10) return 'text-yellow-600';
                 return 'text-red-600';
             };
 
@@ -243,25 +205,15 @@
                         </div>
                     )}
                     
-                    {/* Commits Section */}
+                    {/* Unified Statistics Section */}
                     <div className="mb-4">
                         <h4 className="text-sm font-semibold text-gray-700 mb-2 flex items-center">
                             <span className="text-telus-green mr-2">💻</span>
-                            Commits
+                            Total Commits
                         </h4>
-                        <div className="grid grid-cols-3 gap-2">
-                            <div className="text-center bg-green-50 rounded-lg p-2">
-                                <p className="text-lg font-bold text-telus-green">{commits.last_1_day || 0}</p>
-                                <p className="text-xs text-gray-600">1 day</p>
-                            </div>
-                            <div className="text-center bg-green-50 rounded-lg p-2">
-                                <p className="text-lg font-bold text-telus-green">{commits.last_3_days || 0}</p>
-                                <p className="text-xs text-gray-600">3 days</p>
-                            </div>
-                            <div className="text-center bg-green-50 rounded-lg p-2">
-                                <p className="text-lg font-bold text-telus-green">{commits.last_7_days || 0}</p>
-                                <p className="text-xs text-gray-600">7 days</p>
-                            </div>
+                        <div className="text-center bg-green-50 rounded-lg p-3">
+                            <p className="text-2xl font-bold text-telus-green">{totalCommits}</p>
+                            <p className="text-xs text-gray-600">All time</p>
                         </div>
                     </div>
 
@@ -269,21 +221,11 @@
                     <div className="mb-4">
                         <h4 className="text-sm font-semibold text-gray-700 mb-2 flex items-center">
                             <span className="text-telus-blue mr-2">🎯</span>
-                            Jira Updates
+                            Total Jira Updates
                         </h4>
-                        <div className="grid grid-cols-3 gap-2">
-                            <div className="text-center bg-blue-50 rounded-lg p-2">
-                                <p className="text-lg font-bold text-telus-blue">{jiraUpdates.last_1_day || 0}</p>
-                                <p className="text-xs text-gray-600">1 day</p>
-                            </div>
-                            <div className="text-center bg-blue-50 rounded-lg p-2">
-                                <p className="text-lg font-bold text-telus-blue">{jiraUpdates.last_3_days || 0}</p>
-                                <p className="text-xs text-gray-600">3 days</p>
-                            </div>
-                            <div className="text-center bg-blue-50 rounded-lg p-2">
-                                <p className="text-lg font-bold text-telus-blue">{jiraUpdates.last_7_days || 0}</p>
-                                <p className="text-xs text-gray-600">7 days</p>
-                            </div>
+                        <div className="text-center bg-blue-50 rounded-lg p-3">
+                            <p className="text-2xl font-bold text-telus-blue">{totalJiraUpdates}</p>
+                            <p className="text-xs text-gray-600">All time</p>
                         </div>
                     </div>
 
@@ -291,21 +233,11 @@
                     <div className="mb-4">
                         <h4 className="text-sm font-semibold text-gray-700 mb-2 flex items-center">
                             <span className="text-orange-500 mr-2">⭐</span>
-                            Story Points Closed
+                            Total Story Points Closed
                         </h4>
-                        <div className="grid grid-cols-3 gap-2">
-                            <div className="text-center bg-orange-50 rounded-lg p-2">
-                                <p className="text-lg font-bold text-orange-600">{storyPointsClosed.last_1_day || 0}</p>
-                                <p className="text-xs text-gray-600">1 day</p>
-                            </div>
-                            <div className="text-center bg-orange-50 rounded-lg p-2">
-                                <p className="text-lg font-bold text-orange-600">{storyPointsClosed.last_3_days || 0}</p>
-                                <p className="text-xs text-gray-600">3 days</p>
-                            </div>
-                            <div className="text-center bg-orange-50 rounded-lg p-2">
-                                <p className="text-lg font-bold text-orange-600">{storyPointsClosed.last_7_days || 0}</p>
-                                <p className="text-xs text-gray-600">7 days</p>
-                            </div>
+                        <div className="text-center bg-orange-50 rounded-lg p-3">
+                            <p className="text-2xl font-bold text-orange-600">{totalStoryPointsClosed}</p>
+                            <p className="text-xs text-gray-600">All time</p>
                         </div>
                     </div>
 
@@ -313,10 +245,10 @@
                     <div className="w-full bg-gray-200 rounded-full h-2">
                         <div 
                             className="progress-bar h-2 rounded-full" 
-                            style={{width: `${Math.min((totalActivity / 20) * 100, 100)}%`}}
+                            style={{width: `${Math.min((totalActivity / 50) * 100, 100)}%`}}
                         ></div>
                     </div>
-                    <p className="text-xs text-gray-500 mt-1 text-center">Total 7-day Activity: {totalActivity}</p>
+                    <p className="text-xs text-gray-500 mt-1 text-center">Total Activity: {totalActivity}</p>
                 </div>
             );
         };
@@ -357,9 +289,9 @@
             
             // Calculate summary statistics
             const totalDevelopers = developers.length;
-            const totalCommits1d = developers.reduce((sum, [_, dev]) => sum + (dev.commits?.last_1_day || 0), 0);
-            const totalCommits7d = developers.reduce((sum, [_, dev]) => sum + (dev.commits?.last_7_days || 0), 0);
-            const totalJiraUpdates7d = developers.reduce((sum, [_, dev]) => sum + (dev.jira_updates?.last_7_days || 0), 0);
+            const totalCommits = developers.reduce((sum, [_, dev]) => sum + (dev.total_commits || 0), 0);
+            const totalJiraUpdates = developers.reduce((sum, [_, dev]) => sum + (dev.total_jira_updates || 0), 0);
+            const totalStoryPoints = developers.reduce((sum, [_, dev]) => sum + (dev.total_story_points_closed || 0), 0);
 
             return (
                 <div className="min-h-screen bg-gray-50">
@@ -383,21 +315,21 @@
                                 color="telus-purple"
                             />
                             <SummaryCard 
-                                title="Commits Today" 
-                                value={totalCommits1d} 
+                                title="Total Commits" 
+                                value={totalCommits} 
                                 icon="💻" 
                                 color="telus-green"
                             />
                             <SummaryCard 
-                                title="Commits (7 days)" 
-                                value={totalCommits7d} 
-                                icon="📈" 
+                                title="Total Jira Updates" 
+                                value={totalJiraUpdates} 
+                                icon="🎯" 
                                 color="telus-blue"
                             />
                             <SummaryCard 
-                                title="Jira Updates (7 days)" 
-                                value={totalJiraUpdates7d} 
-                                icon="🎯" 
+                                title="Total Story Points" 
+                                value={totalStoryPoints} 
+                                icon="⭐" 
                                 color="telus-light-purple"
                             />
                         </div>
@@ -416,9 +348,9 @@
                                     Activity Metrics Explanation
                                 </h3>
                                 <div className="text-sm text-gray-700 space-y-2">
-                                    <p><strong>Commits:</strong> Git repository commits authored by each developer within the specified time windows (1, 3, 7 days).</p>
-                                    <p><strong>Jira Updates:</strong> Frequency of issue modifications including status changes, comments, and field updates within temporal boundaries.</p>
-                                    <p><strong>Story Points:</strong> Aggregate estimation units for completed user stories transitioned to 'Done' status within each time period.</p>
+                                    <p><strong>Total Commits:</strong> All Git repository commits authored by each developer across the entire project history.</p>
+                                    <p><strong>Total Jira Updates:</strong> Complete count of issue modifications including status changes, comments, and field updates for all assigned issues.</p>
+                                    <p><strong>Total Story Points Closed:</strong> Sum of all story points for user stories that have been completed and transitioned to 'Done' status.</p>
                                     <p><strong>Issue Codes:</strong> Unique project identifiers extracted from Jira issue keys associated with developer activity.</p>
                                 </div>
                             </div>
@@ -460,16 +392,10 @@
             "developers": {
                 "{'displayName': 'Sample Developer', 'emailAddress': 'sample@telus.com'}": {
                     "name": "{'displayName': 'Sample Developer', 'emailAddress': 'sample@telus.com'}",
-                    "commits": {
-                        "last_1_day": 2,
-                        "last_3_days": 5,
-                        "last_7_days": 8
-                    },
-                    "jira_updates": {
-                        "last_1_day": 1,
-                        "last_3_days": 3,
-                        "last_7_days": 5
-                    }
+                    "total_commits": 25,
+                    "total_jira_updates": 15,
+                    "total_story_points_closed": 42.5,
+                    "issue_codes": ["SET-12345", "SET-67890"]
                 }
             }
         };

@@ -559,7 +559,7 @@ def display_existing_stats():
 
 
 def generate_basic_stats_json():
-    """Generates a JSON file with basic time-based developer statistics."""
+    """Generates a JSON file with unified developer statistics (total commits, jira updates, and story points)."""
     from ..config import BASIC_STATS
 
     if not os.path.exists(DB_NAME):
@@ -620,35 +620,23 @@ def generate_basic_stats_json():
         for assignee in filtered_assignees:
             stats = {
                 "name": assignee,
-                "commits": {
-                    "last_1_day": 0,
-                    "last_3_days": 0,
-                    "last_7_days": 0
-                },
-                "jira_updates": {
-                    "last_1_day": 0,
-                    "last_3_days": 0,
-                    "last_7_days": 0
-                },
-                "story_points_closed": {
-                    "last_1_day": 0,
-                    "last_3_days": 0,
-                    "last_7_days": 0
-                }
+                "total_commits": 0,
+                "total_jira_updates": 0,
+                "total_story_points_closed": 0
             }
 
-            # Get commit statistics for time periods
-            commit_stats = get_time_based_commit_stats(cursor, assignee)
-            stats["commits"] = commit_stats
+            # Get unified commit statistics
+            total_commits = get_unified_commit_stats(cursor, assignee)
+            stats["total_commits"] = total_commits
 
-            # Get Jira update statistics for time periods
-            jira_update_stats = get_time_based_jira_stats(cursor, assignee)
-            stats["jira_updates"] = jira_update_stats
+            # Get unified Jira update statistics
+            total_jira_updates = get_unified_jira_stats(cursor, assignee)
+            stats["total_jira_updates"] = total_jira_updates
 
-            # Get story points for closed stories in time periods
-            story_points_stats = get_time_based_story_points_stats(
+            # Get unified story points for closed stories
+            total_story_points = get_unified_story_points_stats(
                 cursor, assignee)
-            stats["story_points_closed"] = story_points_stats
+            stats["total_story_points_closed"] = total_story_points
 
             # Get issue codes for this assignee
             issue_codes = get_issue_codes_for_assignee(cursor, assignee)
@@ -881,6 +869,92 @@ def get_time_based_story_points_stats(cursor, assignee):
     return stats
 
 
+def get_unified_commit_stats(cursor, assignee):
+    """Get total commit statistics for an assignee."""
+    # Extract email from assignee JSON if possible
+    try:
+        import ast
+        assignee_dict = ast.literal_eval(assignee)
+        assignee_email = assignee_dict.get('emailAddress', '')
+        assignee_name = assignee_dict.get('displayName', '')
+    except:
+        assignee_email = ''
+        assignee_name = assignee
+
+    # Get all commits for this assignee
+    search_conditions = []
+    search_params = []
+
+    if assignee_email:
+        search_conditions.append("author_email = ?")
+        search_params.append(assignee_email)
+    if assignee_name:
+        search_conditions.append("author_name = ?")
+        search_params.append(assignee_name)
+
+    if not search_conditions:
+        return 0
+
+    # Use OR to combine conditions, but avoid double counting
+    where_clause = " OR ".join(search_conditions)
+
+    cursor.execute(f"""
+        SELECT COUNT(DISTINCT hash) 
+        FROM git_commits 
+        WHERE {where_clause}
+    """, search_params)
+
+    result = cursor.fetchone()
+    return result[0] if result else 0
+
+
+def get_unified_jira_stats(cursor, assignee):
+    """Get total Jira update statistics for an assignee."""
+    # Check if updated column exists
+    cursor.execute(f"PRAGMA table_info({TABLE_NAME})")
+    columns = [info[1] for info in cursor.fetchall()]
+
+    if 'updated' not in columns:
+        return 0
+
+    # Count all Jira updates for this assignee
+    cursor.execute(f"""
+        SELECT COUNT(*) 
+        FROM {TABLE_NAME} 
+        WHERE assignee = ?
+    """, (assignee,))
+
+    result = cursor.fetchone()
+    return result[0] if result else 0
+
+
+def get_unified_story_points_stats(cursor, assignee):
+    """Get total story points for closed stories for an assignee."""
+    # Check if required columns exist
+    cursor.execute(f"PRAGMA table_info({TABLE_NAME})")
+    columns = [info[1] for info in cursor.fetchall()]
+
+    if 'customfield_10026' not in columns or 'status' not in columns:
+        return 0
+
+    # Common "closed" status indicators
+    closed_statuses = ["Done", "Closed", "Resolved", "Complete", "Completed"]
+    status_placeholders = ','.join(['?' for _ in closed_statuses])
+
+    # Sum of story points for closed stories
+    cursor.execute(f"""
+        SELECT SUM(CAST(customfield_10026 AS REAL)) 
+        FROM {TABLE_NAME} 
+        WHERE assignee = ? 
+        AND status IN ({status_placeholders})
+        AND customfield_10026 IS NOT NULL 
+        AND customfield_10026 != ''
+    """, (assignee, *closed_statuses))
+
+    result = cursor.fetchone()[0]
+    return round(result, 1) if result else 0
+
+
 def get_issue_codes_for_assignee(cursor, assignee):
     """Get issue codes for a specific assignee from the watches field."""
     # Check if watches column exists
@@ -908,19 +982,13 @@ def get_issue_codes_for_assignee(cursor, assignee):
 
 
 def display_basic_stats_summary(developer_basic_stats):
-    """Display a summary table of basic developer statistics."""
+    """Display a summary table of unified developer statistics."""
     table = Table(show_header=True, header_style="bold green")
     table.add_column("Developer")
     table.add_column("Email")
-    table.add_column("Commits (1d)")
-    table.add_column("Commits (3d)")
-    table.add_column("Commits (7d)")
-    table.add_column("Jira Updates (1d)")
-    table.add_column("Jira Updates (3d)")
-    table.add_column("Jira Updates (7d)")
-    table.add_column("Story Points (1d)")
-    table.add_column("Story Points (3d)")
-    table.add_column("Story Points (7d)")
+    table.add_column("Total Commits")
+    table.add_column("Total Jira Updates")
+    table.add_column("Total Story Points Closed")
 
     for assignee_json, stats in developer_basic_stats.items():
         # Extract clean name and email for display
@@ -929,19 +997,13 @@ def display_basic_stats_summary(developer_basic_stats):
         table.add_row(
             name,
             email,
-            str(stats["commits"]["last_1_day"]),
-            str(stats["commits"]["last_3_days"]),
-            str(stats["commits"]["last_7_days"]),
-            str(stats["jira_updates"]["last_1_day"]),
-            str(stats["jira_updates"]["last_3_days"]),
-            str(stats["jira_updates"]["last_7_days"]),
-            str(stats["story_points_closed"]["last_1_day"]),
-            str(stats["story_points_closed"]["last_3_days"]),
-            str(stats["story_points_closed"]["last_7_days"])
+            str(stats["total_commits"]),
+            str(stats["total_jira_updates"]),
+            str(stats["total_story_points_closed"])
         )
 
     console.print(
-        "\n[bold yellow]Basic Developer Statistics Summary:[/bold yellow]")
+        "\n[bold yellow]Unified Developer Statistics Summary:[/bold yellow]")
     console.print(table)
 
 

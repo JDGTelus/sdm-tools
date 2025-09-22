@@ -76,7 +76,7 @@ Set the following environment variables for configuration:
 - `REPO_PATH`: Path to the local repository (e.g., `/path/to/repo`)
 
 #### Optional Variables (with defaults)
-- `DB_NAME`: Name of the SQLite database file (default: `sdm_tools.db`)
+- `DB_NAME`: Name of the SQLite database file (default: `data/sdm_tools.db`)
 - `TABLE_NAME`: Name of the table to store issues (default: `iotmi_3p_issues`)
 - `BASIC_STATS`: Path to the basic statistics JSON file (default: `ux/web/data/team_basic_stats.json`)
 - `SIMPLE_STATS`: Path to the simple statistics JSON file (default: `ux/web/data/team_simple_stats.json`)
