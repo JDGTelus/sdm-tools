@@ -1185,6 +1185,7 @@ def generate_sprint_stats_json():
 def get_sprint_stats_for_developer(cursor, assignee, sprint_id, start_date, end_date):
     """Get sprint-specific statistics for a developer."""
     from datetime import datetime
+    import re
 
     stats = {
         "commits_in_sprint": 0,
@@ -1193,76 +1194,93 @@ def get_sprint_stats_for_developer(cursor, assignee, sprint_id, start_date, end_
         "story_points_closed_in_sprint": 0
     }
 
-    # Extract developer info
+    # Extract developer info - handle JSON string format
     try:
-        import ast
-        assignee_dict = ast.literal_eval(assignee)
+        import json
+        assignee_dict = json.loads(assignee)
         assignee_email = assignee_dict.get('emailAddress', '')
         assignee_name = assignee_dict.get('displayName', '')
-    except:
-        assignee_email = ''
-        assignee_name = assignee
+    except (json.JSONDecodeError, TypeError):
+        # Fallback to ast.literal_eval for older format
+        try:
+            import ast
+            assignee_dict = ast.literal_eval(assignee)
+            assignee_email = assignee_dict.get('emailAddress', '')
+            assignee_name = assignee_dict.get('displayName', '')
+        except:
+            assignee_email = ''
+            assignee_name = assignee
 
-    # Parse sprint dates
+    # Parse sprint dates - handle different timezone formats
     try:
         if start_date:
-            sprint_start = datetime.fromisoformat(
-                start_date.replace('Z', '+00:00'))
+            # Handle both 'Z' and '+00:00' timezone formats
+            start_date_clean = start_date.replace('Z', '+00:00')
+            sprint_start = datetime.fromisoformat(start_date_clean)
         else:
             sprint_start = None
 
         if end_date:
-            sprint_end = datetime.fromisoformat(
-                end_date.replace('Z', '+00:00'))
+            end_date_clean = end_date.replace('Z', '+00:00')
+            sprint_end = datetime.fromisoformat(end_date_clean)
         else:
             sprint_end = None
-    except:
+    except Exception as e:
+        console.print(
+            f"[bold yellow]Warning: Could not parse sprint dates for sprint {sprint_id}: {e}[/bold yellow]")
         sprint_start = None
         sprint_end = None
 
-    # 1. Get commits during sprint period
+    # 1. Get commits during sprint period with improved date matching
     if sprint_start and sprint_end and (assignee_email or assignee_name):
         search_conditions = []
         search_params = []
 
         if assignee_email:
-            search_conditions.append("author_email = ?")
-            search_params.append(assignee_email)
+            search_conditions.append("author_email LIKE ?")
+            search_params.append(f"%{assignee_email}%")
         if assignee_name:
-            search_conditions.append("author_name = ?")
-            search_params.append(assignee_name)
+            search_conditions.append("author_name LIKE ?")
+            search_params.append(f"%{assignee_name}%")
 
         where_clause = " OR ".join(search_conditions)
 
+        # Get all commits with dates for this developer
         cursor.execute(f"""
-            SELECT COUNT(DISTINCT hash) 
+            SELECT DISTINCT hash, date 
             FROM git_commits 
             WHERE ({where_clause}) AND date IS NOT NULL
         """, search_params)
 
-        all_commits = cursor.fetchall()
-
-        # Filter commits by date range
-        cursor.execute(f"""
-            SELECT DISTINCT date 
-            FROM git_commits 
-            WHERE ({where_clause}) AND date IS NOT NULL
-        """, search_params)
-
-        commit_dates = cursor.fetchall()
+        commit_data = cursor.fetchall()
         commits_in_range = 0
 
-        for (date_str,) in commit_dates:
+        for hash_val, date_str in commit_data:
             try:
-                # Parse git date format and check if it's in sprint range
-                import re
-                date_clean = re.sub(r'\s+[+-]\d{4}$', '', date_str)
-                commit_date = datetime.strptime(
-                    date_clean, '%a %b %d %H:%M:%S %Y')
+                # Parse git date format: "Wed Sep 17 23:37:12 2025 +0000" or similar
+                # Remove timezone info and parse
+                date_clean = re.sub(r'\s+[+-]\d{4}$', '', date_str.strip())
 
-                if sprint_start <= commit_date <= sprint_end:
+                # Try different date formats
+                commit_date = None
+                date_formats = [
+                    '%a %b %d %H:%M:%S %Y',  # Wed Sep 17 23:37:12 2025
+                    '%Y-%m-%d %H:%M:%S',     # 2025-09-17 23:37:12
+                    '%Y-%m-%d',              # 2025-09-17
+                ]
+
+                for fmt in date_formats:
+                    try:
+                        commit_date = datetime.strptime(date_clean, fmt)
+                        break
+                    except ValueError:
+                        continue
+
+                if commit_date and sprint_start <= commit_date <= sprint_end:
                     commits_in_range += 1
-            except:
+
+            except Exception as e:
+                # Skip commits with unparseable dates
                 continue
 
         stats["commits_in_sprint"] = commits_in_range
@@ -1276,63 +1294,121 @@ def get_sprint_stats_for_developer(cursor, assignee, sprint_id, start_date, end_
 
     stats["issues_assigned_in_sprint"] = cursor.fetchone()[0]
 
-    # 3. Get issues closed during sprint period
+    # 3. Get issues closed during sprint period - Fix status JSON parsing
     closed_statuses = ["Done", "Closed", "Resolved", "Complete", "Completed"]
-    status_placeholders = ','.join(['?' for _ in closed_statuses])
 
     if sprint_start and sprint_end:
         sprint_start_str = sprint_start.isoformat()
         sprint_end_str = sprint_end.isoformat()
 
+        # Get all issues for this assignee in this sprint within date range
         cursor.execute(f"""
-            SELECT COUNT(*) 
+            SELECT status, customfield_10026
             FROM {TABLE_NAME} 
             WHERE assignee = ? 
             AND customfield_10020 LIKE ?
-            AND status IN ({status_placeholders})
             AND updated >= ? AND updated <= ?
-        """, (assignee, f'%{sprint_id}%', *closed_statuses, sprint_start_str, sprint_end_str))
+        """, (assignee, f'%{sprint_id}%', sprint_start_str, sprint_end_str))
 
-        stats["issues_closed_in_sprint"] = cursor.fetchone()[0]
+        issues_data = cursor.fetchall()
+        closed_count = 0
+        total_story_points = 0
 
-        # 4. Get story points for closed issues in sprint
-        cursor.execute(f"""
-            SELECT SUM(CAST(customfield_10026 AS REAL)) 
-            FROM {TABLE_NAME} 
-            WHERE assignee = ? 
-            AND customfield_10020 LIKE ?
-            AND status IN ({status_placeholders})
-            AND updated >= ? AND updated <= ?
-            AND customfield_10026 IS NOT NULL AND customfield_10026 != ''
-        """, (assignee, f'%{sprint_id}%', *closed_statuses, sprint_start_str, sprint_end_str))
+        for status_json, story_points_str in issues_data:
+            try:
+                # Parse status JSON to get actual status name
+                status_dict = json.loads(status_json)
+                status_name = status_dict.get('name', '')
 
-        result = cursor.fetchone()[0]
-        stats["story_points_closed_in_sprint"] = round(
-            result, 1) if result else 0
+                if status_name in closed_statuses:
+                    closed_count += 1
+
+                    # Add story points if available
+                    if story_points_str and story_points_str.strip() and story_points_str != 'null':
+                        try:
+                            story_points_value = float(
+                                story_points_str.strip())
+                            total_story_points += story_points_value
+                        except (ValueError, TypeError):
+                            continue
+
+            except (json.JSONDecodeError, TypeError):
+                # Try fallback parsing for status
+                try:
+                    import ast
+                    status_dict = ast.literal_eval(status_json)
+                    status_name = status_dict.get('name', '')
+
+                    if status_name in closed_statuses:
+                        closed_count += 1
+
+                        # Add story points if available
+                        if story_points_str and story_points_str.strip() and story_points_str != 'null':
+                            try:
+                                story_points_value = float(
+                                    story_points_str.strip())
+                                total_story_points += story_points_value
+                            except (ValueError, TypeError):
+                                continue
+                except:
+                    continue
+
+        stats["issues_closed_in_sprint"] = closed_count
+        stats["story_points_closed_in_sprint"] = round(total_story_points, 1)
     else:
         # If no date range, just check for closed issues in the sprint
         cursor.execute(f"""
-            SELECT COUNT(*) 
+            SELECT status, customfield_10026
             FROM {TABLE_NAME} 
             WHERE assignee = ? 
             AND customfield_10020 LIKE ?
-            AND status IN ({status_placeholders})
-        """, (assignee, f'%{sprint_id}%', *closed_statuses))
+        """, (assignee, f'%{sprint_id}%'))
 
-        stats["issues_closed_in_sprint"] = cursor.fetchone()[0]
+        issues_data = cursor.fetchall()
+        closed_count = 0
+        total_story_points = 0
 
-        cursor.execute(f"""
-            SELECT SUM(CAST(customfield_10026 AS REAL)) 
-            FROM {TABLE_NAME} 
-            WHERE assignee = ? 
-            AND customfield_10020 LIKE ?
-            AND status IN ({status_placeholders})
-            AND customfield_10026 IS NOT NULL AND customfield_10026 != ''
-        """, (assignee, f'%{sprint_id}%', *closed_statuses))
+        for status_json, story_points_str in issues_data:
+            try:
+                # Parse status JSON to get actual status name
+                status_dict = json.loads(status_json)
+                status_name = status_dict.get('name', '')
 
-        result = cursor.fetchone()[0]
-        stats["story_points_closed_in_sprint"] = round(
-            result, 1) if result else 0
+                if status_name in closed_statuses:
+                    closed_count += 1
+
+                    # Add story points if available
+                    if story_points_str and story_points_str.strip() and story_points_str != 'null':
+                        try:
+                            story_points_value = float(
+                                story_points_str.strip())
+                            total_story_points += story_points_value
+                        except (ValueError, TypeError):
+                            continue
+
+            except (json.JSONDecodeError, TypeError):
+                # Try fallback parsing for status
+                try:
+                    import ast
+                    status_dict = ast.literal_eval(status_json)
+                    status_name = status_dict.get('name', '')
+
+                    if status_name in closed_statuses:
+                        closed_count += 1
+
+                        # Add story points if available
+                        if story_points_str and story_points_str.strip() and story_points_str != 'null':
+                            try:
+                                story_points_value = float(
+                                    story_points_str.strip())
+                                total_story_points += story_points_value
+                            except (ValueError, TypeError):
+                                continue
+                except:
+                    continue
+
+        stats["issues_closed_in_sprint"] = closed_count
+        stats["story_points_closed_in_sprint"] = round(total_story_points, 1)
 
     return stats
 

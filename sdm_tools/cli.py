@@ -358,6 +358,13 @@ def handle_html_generation_option():
                             f"[bold yellow]Skipping {filename} - Simple statistics file not found at {SIMPLE_STATS}.[/bold yellow]")
                         continue
                     json_file = SIMPLE_STATS
+                elif "sprint" in filename.lower():
+                    sprint_stats_file = "ux/web/data/team_sprint_stats.json"
+                    if not os.path.exists(sprint_stats_file):
+                        console.print(
+                            f"[bold yellow]Skipping {filename} - Sprint statistics file not found at {sprint_stats_file}.[/bold yellow]")
+                        continue
+                    json_file = sprint_stats_file
                 else:
                     console.print(
                         f"[bold yellow]Skipping {filename} - Cannot determine which JSON file to use.[/bold yellow]")
