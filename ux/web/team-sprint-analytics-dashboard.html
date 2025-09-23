@@ -1,0 +1,742 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Team Sprint Analytics Dashboard</title>
+    <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        'telus-purple': '#4B0082',
+                        'telus-green': '#66CC00',
+                        'telus-blue': '#0066CC',
+                        'telus-light-purple': '#8A2BE2',
+                        'telus-dark-purple': '#2E0054',
+                    }
+                }
+            }
+        }
+    </script>
+    <link rel="stylesheet" href="shared-dashboard-styles.css">
+</head>
+<body class="bg-gray-50">
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useMemo } = React;
+
+        // Utility function to format dates
+        const formatDate = (dateString) => {
+            if (!dateString) return 'N/A';
+            try {
+                return new Date(dateString).toLocaleDateString('en-US', {
+                    year: 'numeric',
+                    month: 'short',
+                    day: 'numeric'
+                });
+            } catch {
+                return 'N/A';
+            }
+        };
+
+        // Utility function to get sprint status badge color
+        const getSprintStatusColor = (state) => {
+            switch (state?.toLowerCase()) {
+                case 'active': return 'bg-green-100 text-green-800';
+                case 'closed': return 'bg-gray-100 text-gray-800';
+                case 'future': return 'bg-blue-100 text-blue-800';
+                default: return 'bg-gray-100 text-gray-600';
+            }
+        };
+
+        // Summary Card Component
+        const SummaryCard = ({ title, value, icon, color = "telus-purple", subtitle = "" }) => (
+            <div className={`bg-white rounded-xl shadow-lg p-6 card-hover border-l-4 border-${color}`}>
+                <div className="flex items-center justify-between">
+                    <div>
+                        <p className="text-gray-600 text-sm font-medium">{title}</p>
+                        <p className={`text-3xl font-bold text-${color} mt-2`}>{value}</p>
+                        {subtitle && <p className="text-gray-500 text-xs mt-1">{subtitle}</p>}
+                    </div>
+                    <div className={`text-${color} text-4xl`}>{icon}</div>
+                </div>
+            </div>
+        );
+
+        // Sprint Filter Component
+        const SprintFilter = ({ sprints, selectedSprints, onSprintToggle, onSelectAll, onClearAll }) => {
+            const [isExpanded, setIsExpanded] = useState(false);
+            
+            return (
+                <div className="bg-white rounded-xl shadow-lg p-6 mb-8">
+                    <div className="flex items-center justify-between mb-4">
+                        <h3 className="text-lg font-semibold text-gray-800 flex items-center">
+                            <span className="text-telus-purple mr-2">🎯</span>
+                            Sprint Filter ({selectedSprints.length} of {sprints.length} selected)
+                        </h3>
+                        <button
+                            onClick={() => setIsExpanded(!isExpanded)}
+                            className="text-telus-purple hover:text-telus-light-purple transition-colors"
+                        >
+                            {isExpanded ? '▼' : '▶'}
+                        </button>
+                    </div>
+                    
+                    <div className="flex gap-2 mb-4">
+                        <button
+                            onClick={onSelectAll}
+                            className="px-3 py-1 bg-telus-purple text-white rounded-lg text-sm hover:bg-telus-light-purple transition-colors"
+                        >
+                            Select All
+                        </button>
+                        <button
+                            onClick={onClearAll}
+                            className="px-3 py-1 bg-gray-500 text-white rounded-lg text-sm hover:bg-gray-600 transition-colors"
+                        >
+                            Clear All
+                        </button>
+                    </div>
+                    
+                    {isExpanded && (
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 max-h-60 overflow-y-auto">
+                            {sprints.map((sprint) => (
+                                <label key={sprint.key} className="flex items-center space-x-3 p-3 rounded-lg hover:bg-gray-50 cursor-pointer">
+                                    <input
+                                        type="checkbox"
+                                        checked={selectedSprints.includes(sprint.key)}
+                                        onChange={() => onSprintToggle(sprint.key)}
+                                        className="w-4 h-4 text-telus-purple border-gray-300 rounded focus:ring-telus-purple"
+                                    />
+                                    <div className="flex-1 min-w-0">
+                                        <div className="flex items-center gap-2">
+                                            <span className="text-sm font-medium text-gray-900 truncate">
+                                                {sprint.info.name}
+                                            </span>
+                                            <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${getSprintStatusColor(sprint.info.state)}`}>
+                                                {sprint.info.state}
+                                            </span>
+                                        </div>
+                                        <div className="text-xs text-gray-500">
+                                            {formatDate(sprint.info.start_date)} - {formatDate(sprint.info.end_date)}
+                                        </div>
+                                    </div>
+                                </label>
+                            ))}
+                        </div>
+                    )}
+                </div>
+            );
+        };
+
+        // Sprint Overview Card Component
+        const SprintOverviewCard = ({ sprint }) => {
+            const totalDevelopers = Object.keys(sprint.developers).length;
+            const totalCommits = Object.values(sprint.developers).reduce((sum, dev) => sum + dev.commits_in_sprint, 0);
+            const totalIssuesAssigned = Object.values(sprint.developers).reduce((sum, dev) => sum + dev.issues_assigned_in_sprint, 0);
+            const totalIssuesClosed = Object.values(sprint.developers).reduce((sum, dev) => sum + dev.issues_closed_in_sprint, 0);
+            const totalStoryPoints = Object.values(sprint.developers).reduce((sum, dev) => sum + dev.story_points_closed_in_sprint, 0);
+            
+            const completionRate = totalIssuesAssigned > 0 ? ((totalIssuesClosed / totalIssuesAssigned) * 100).toFixed(1) : 0;
+
+            return (
+                <div className="bg-white rounded-xl shadow-lg p-6 card-hover mb-8">
+                    <div className="flex items-center justify-between mb-4">
+                        <div>
+                            <h3 className="text-xl font-bold text-gray-800">{sprint.sprint_info.name}</h3>
+                            <p className="text-gray-600 text-sm">
+                                {formatDate(sprint.sprint_info.start_date)} - {formatDate(sprint.sprint_info.end_date)}
+                            </p>
+                        </div>
+                        <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${getSprintStatusColor(sprint.sprint_info.state)}`}>
+                            {sprint.sprint_info.state}
+                        </span>
+                    </div>
+                    
+                    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+                        <div className="text-center">
+                            <p className="text-2xl font-bold text-telus-purple">{totalDevelopers}</p>
+                            <p className="text-xs text-gray-600">Developers</p>
+                        </div>
+                        <div className="text-center">
+                            <p className="text-2xl font-bold text-telus-green">{totalCommits}</p>
+                            <p className="text-xs text-gray-600">Commits</p>
+                        </div>
+                        <div className="text-center">
+                            <p className="text-2xl font-bold text-telus-blue">{totalIssuesAssigned}</p>
+                            <p className="text-xs text-gray-600">Issues Assigned</p>
+                        </div>
+                        <div className="text-center">
+                            <p className="text-2xl font-bold text-orange-600">{totalIssuesClosed}</p>
+                            <p className="text-xs text-gray-600">Issues Closed</p>
+                        </div>
+                        <div className="text-center">
+                            <p className="text-2xl font-bold text-purple-600">{totalStoryPoints}</p>
+                            <p className="text-xs text-gray-600">Story Points</p>
+                        </div>
+                        <div className="text-center">
+                            <p className="text-2xl font-bold text-indigo-600">{completionRate}%</p>
+                            <p className="text-xs text-gray-600">Completion</p>
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        // Developer Performance Card Component
+        const DeveloperPerformanceCard = ({ developer, developerName, sprintName }) => {
+            const totalActivity = developer.commits_in_sprint + developer.issues_assigned_in_sprint;
+            
+            const getPerformanceColor = (activity) => {
+                if (activity >= 10) return 'text-green-600';
+                if (activity >= 5) return 'text-yellow-600';
+                return 'text-red-600';
+            };
+
+            return (
+                <div className="bg-white rounded-xl shadow-lg p-4 card-hover">
+                    <div className="flex items-center justify-between mb-3">
+                        <div>
+                            <h4 className="font-semibold text-gray-800 text-sm">{developerName}</h4>
+                            <p className="text-gray-500 text-xs">{developer.email}</p>
+                        </div>
+                        <div className={`text-lg font-bold ${getPerformanceColor(totalActivity)}`}>
+                            {totalActivity}
+                        </div>
+                    </div>
+                    
+                    <div className="grid grid-cols-2 gap-3 text-center">
+                        <div className="bg-green-50 rounded-lg p-2">
+                            <p className="text-lg font-bold text-telus-green">{developer.commits_in_sprint}</p>
+                            <p className="text-xs text-gray-600">Commits</p>
+                        </div>
+                        <div className="bg-blue-50 rounded-lg p-2">
+                            <p className="text-lg font-bold text-telus-blue">{developer.issues_assigned_in_sprint}</p>
+                            <p className="text-xs text-gray-600">Assigned</p>
+                        </div>
+                        <div className="bg-orange-50 rounded-lg p-2">
+                            <p className="text-lg font-bold text-orange-600">{developer.issues_closed_in_sprint}</p>
+                            <p className="text-xs text-gray-600">Closed</p>
+                        </div>
+                        <div className="bg-purple-50 rounded-lg p-2">
+                            <p className="text-lg font-bold text-purple-600">{developer.story_points_closed_in_sprint}</p>
+                            <p className="text-xs text-gray-600">Points</p>
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        // Sprint Performance Table Component
+        const SprintPerformanceTable = ({ sprints, developers }) => {
+            return (
+                <div className="table-container bg-white">
+                    <table className="min-w-full">
+                        <thead className="bg-gradient-to-r from-telus-purple to-telus-light-purple text-white">
+                            <tr>
+                                <th className="px-6 py-4 text-left text-sm font-semibold">Developer</th>
+                                <th className="px-6 py-4 text-center text-sm font-semibold">Sprint</th>
+                                <th className="px-6 py-4 text-center text-sm font-semibold">Commits</th>
+                                <th className="px-6 py-4 text-center text-sm font-semibold">Issues Assigned</th>
+                                <th className="px-6 py-4 text-center text-sm font-semibold">Issues Closed</th>
+                                <th className="px-6 py-4 text-center text-sm font-semibold">Story Points</th>
+                                <th className="px-6 py-4 text-center text-sm font-semibold">Completion %</th>
+                            </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-200">
+                            {developers.map((dev, index) => {
+                                const completionRate = dev.issues_assigned_in_sprint > 0 
+                                    ? ((dev.issues_closed_in_sprint / dev.issues_assigned_in_sprint) * 100).toFixed(1)
+                                    : 0;
+                                
+                                return (
+                                    <tr key={`${dev.sprintKey}-${dev.name}`} className={`${index % 2 === 0 ? 'bg-gray-50' : 'bg-white'} hover:bg-blue-50 transition-colors`}>
+                                        <td className="px-6 py-4">
+                                            <div className="font-medium text-gray-900">{dev.name}</div>
+                                            <div className="text-gray-500 text-xs">{dev.email}</div>
+                                        </td>
+                                        <td className="px-6 py-4 text-center">
+                                            <div className="text-sm font-medium text-gray-900">{dev.sprintName}</div>
+                                            <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${getSprintStatusColor(dev.sprintState)}`}>
+                                                {dev.sprintState}
+                                            </span>
+                                        </td>
+                        <td className="px-6 py-4 text-center">
+                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                                {dev.commits_in_sprint}
+                            </span>
+                        </td>
+                        <td className="px-6 py-4 text-center">
+                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                                {dev.issues_assigned_in_sprint}
+                            </span>
+                        </td>
+                        <td className="px-6 py-4 text-center">
+                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-orange-100 text-orange-800">
+                                {dev.issues_closed_in_sprint}
+                            </span>
+                        </td>
+                        <td className="px-6 py-4 text-center">
+                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
+                                {dev.story_points_closed_in_sprint}
+                            </span>
+                        </td>
+                        <td className="px-6 py-4 text-center">
+                            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                                completionRate >= 80 ? 'bg-green-100 text-green-800' :
+                                completionRate >= 50 ? 'bg-yellow-100 text-yellow-800' :
+                                'bg-red-100 text-red-800'
+                            }`}>
+                                {completionRate}%
+                            </span>
+                        </td>
+                    </tr>
+                );
+            })}
+        </tbody>
+    </table>
+</div>
+            );
+        };
+
+        // Aggregated Developer Performance Component
+        const AggregatedDeveloperPerformance = ({ developers }) => {
+            const aggregatedData = useMemo(() => {
+                const devMap = {};
+                
+                developers.forEach(dev => {
+                    if (!devMap[dev.name]) {
+                        devMap[dev.name] = {
+                            name: dev.name,
+                            email: dev.email,
+                            totalCommits: 0,
+                            totalIssuesAssigned: 0,
+                            totalIssuesClosed: 0,
+                            totalStoryPoints: 0,
+                            sprintCount: 0
+                        };
+                    }
+                    
+                    devMap[dev.name].totalCommits += dev.commits_in_sprint;
+                    devMap[dev.name].totalIssuesAssigned += dev.issues_assigned_in_sprint;
+                    devMap[dev.name].totalIssuesClosed += dev.issues_closed_in_sprint;
+                    devMap[dev.name].totalStoryPoints += dev.story_points_closed_in_sprint;
+                    devMap[dev.name].sprintCount += 1;
+                });
+                
+                return Object.values(devMap).sort((a, b) => 
+                    (b.totalCommits + b.totalIssuesAssigned) - (a.totalCommits + a.totalIssuesAssigned)
+                );
+            }, [developers]);
+
+            return (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                    {aggregatedData.map((dev) => {
+                        const totalActivity = dev.totalCommits + dev.totalIssuesAssigned;
+                        const avgActivity = dev.sprintCount > 0 ? (totalActivity / dev.sprintCount).toFixed(1) : 0;
+                        const completionRate = dev.totalIssuesAssigned > 0 
+                            ? ((dev.totalIssuesClosed / dev.totalIssuesAssigned) * 100).toFixed(1)
+                            : 0;
+
+                        return (
+                            <div key={dev.name} className="bg-white rounded-xl shadow-lg p-6 card-hover">
+                                <div className="flex items-center justify-between mb-4">
+                                    <div>
+                                        <h4 className="font-bold text-lg text-gray-800">{dev.name}</h4>
+                                        <p className="text-gray-500 text-sm">{dev.email}</p>
+                                        <p className="text-gray-400 text-xs">{dev.sprintCount} sprints</p>
+                                    </div>
+                                    <div className="text-right">
+                                        <div className="text-2xl font-bold text-telus-purple">{totalActivity}</div>
+                                        <div className="text-xs text-gray-500">Total Activity</div>
+                                    </div>
+                                </div>
+                                
+                                <div className="grid grid-cols-2 gap-3 mb-4">
+                                    <div className="bg-green-50 rounded-lg p-3 text-center">
+                                        <p className="text-xl font-bold text-telus-green">{dev.totalCommits}</p>
+                                        <p className="text-xs text-gray-600">Total Commits</p>
+                                    </div>
+                                    <div className="bg-blue-50 rounded-lg p-3 text-center">
+                                        <p className="text-xl font-bold text-telus-blue">{dev.totalIssuesAssigned}</p>
+                                        <p className="text-xs text-gray-600">Issues Assigned</p>
+                                    </div>
+                                    <div className="bg-orange-50 rounded-lg p-3 text-center">
+                                        <p className="text-xl font-bold text-orange-600">{dev.totalIssuesClosed}</p>
+                                        <p className="text-xs text-gray-600">Issues Closed</p>
+                                    </div>
+                                    <div className="bg-purple-50 rounded-lg p-3 text-center">
+                                        <p className="text-xl font-bold text-purple-600">{dev.totalStoryPoints}</p>
+                                        <p className="text-xs text-gray-600">Story Points</p>
+                                    </div>
+                                </div>
+                                
+                                <div className="flex justify-between text-sm">
+                                    <span className="text-gray-600">Avg/Sprint: {avgActivity}</span>
+                                    <span className={`font-semibold ${
+                                        completionRate >= 80 ? 'text-green-600' :
+                                        completionRate >= 50 ? 'text-yellow-600' :
+                                        'text-red-600'
+                                    }`}>
+                                        {completionRate}% completion
+                                    </span>
+                                </div>
+                            </div>
+                        );
+                    })}
+                </div>
+            );
+        };
+
+        // Main Dashboard Component
+        const Dashboard = () => {
+            const [teamData, setTeamData] = useState(null);
+            const [loading, setLoading] = useState(true);
+            const [selectedSprints, setSelectedSprints] = useState([]);
+            const [viewMode, setViewMode] = useState('overview'); // 'overview', 'detailed', 'aggregated'
+
+            useEffect(() => {
+                // Try to load the sprint analytics JSON data
+                fetch('./data/team_sprint_stats.json')
+                    .then(response => response.json())
+                    .then(data => {
+                        setTeamData(data);
+                        // Initially select all sprints
+                        const sprintKeys = Object.keys(data.sprint_analytics || {});
+                        setSelectedSprints(sprintKeys);
+                        setLoading(false);
+                    })
+                    .catch(error => {
+                        console.error('Error loading data:', error);
+                        // Fallback to embedded data if fetch fails
+                        setTeamData(embeddedData);
+                        const sprintKeys = Object.keys(embeddedData.sprint_analytics || {});
+                        setSelectedSprints(sprintKeys);
+                        setLoading(false);
+                    });
+            }, []);
+
+            // Process sprint data for filtering
+            const sprints = useMemo(() => {
+                if (!teamData?.sprint_analytics) return [];
+                
+                return Object.entries(teamData.sprint_analytics).map(([key, sprint]) => ({
+                    key,
+                    info: sprint.sprint_info,
+                    developers: sprint.developers
+                })).sort((a, b) => new Date(b.info.start_date) - new Date(a.info.start_date));
+            }, [teamData]);
+
+            // Filter selected sprints
+            const filteredSprints = useMemo(() => {
+                return sprints.filter(sprint => selectedSprints.includes(sprint.key));
+            }, [sprints, selectedSprints]);
+
+            // Flatten developers for table view
+            const flattenedDevelopers = useMemo(() => {
+                const developers = [];
+                filteredSprints.forEach(sprint => {
+                    Object.entries(sprint.developers).forEach(([name, dev]) => {
+                        developers.push({
+                            ...dev,
+                            sprintKey: sprint.key,
+                            sprintName: sprint.info.name,
+                            sprintState: sprint.info.state
+                        });
+                    });
+                });
+                return developers.sort((a, b) => a.name.localeCompare(b.name));
+            }, [filteredSprints]);
+
+            // Calculate aggregated statistics
+            const aggregatedStats = useMemo(() => {
+                const totalSprints = filteredSprints.length;
+                const totalDevelopers = new Set(flattenedDevelopers.map(dev => dev.name)).size;
+                const totalCommits = flattenedDevelopers.reduce((sum, dev) => sum + dev.commits_in_sprint, 0);
+                const totalIssuesAssigned = flattenedDevelopers.reduce((sum, dev) => sum + dev.issues_assigned_in_sprint, 0);
+                const totalIssuesClosed = flattenedDevelopers.reduce((sum, dev) => sum + dev.issues_closed_in_sprint, 0);
+                const totalStoryPoints = flattenedDevelopers.reduce((sum, dev) => sum + dev.story_points_closed_in_sprint, 0);
+                
+                return {
+                    totalSprints,
+                    totalDevelopers,
+                    totalCommits,
+                    totalIssuesAssigned,
+                    totalIssuesClosed,
+                    totalStoryPoints,
+                    avgCompletionRate: totalIssuesAssigned > 0 ? ((totalIssuesClosed / totalIssuesAssigned) * 100).toFixed(1) : 0
+                };
+            }, [filteredSprints, flattenedDevelopers]);
+
+            const handleSprintToggle = (sprintKey) => {
+                setSelectedSprints(prev => 
+                    prev.includes(sprintKey) 
+                        ? prev.filter(key => key !== sprintKey)
+                        : [...prev, sprintKey]
+                );
+            };
+
+            const handleSelectAll = () => {
+                setSelectedSprints(sprints.map(sprint => sprint.key));
+            };
+
+            const handleClearAll = () => {
+                setSelectedSprints([]);
+            };
+
+            if (loading) {
+                return (
+                    <div className="min-h-screen flex items-center justify-center">
+                        <div className="text-center">
+                            <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-telus-purple mx-auto"></div>
+                            <p className="mt-4 text-gray-600">Loading sprint analytics...</p>
+                        </div>
+                    </div>
+                );
+            }
+
+            return (
+                <div className="min-h-screen bg-gray-50">
+                    {/* Header */}
+                    <div className="gradient-bg text-white py-12">
+                        <div className="container mx-auto px-6">
+                            <h1 className="text-4xl font-bold mb-4">Team Sprint Analytics Dashboard</h1>
+                            <p className="text-xl opacity-90">
+                                Sprint Performance Insights • Generated on {new Date(teamData.generated_at).toLocaleDateString()}
+                            </p>
+                        </div>
+                    </div>
+
+                    <div className="container mx-auto px-6 py-8">
+                        {/* Sprint Filter */}
+                        <SprintFilter 
+                            sprints={sprints}
+                            selectedSprints={selectedSprints}
+                            onSprintToggle={handleSprintToggle}
+                            onSelectAll={handleSelectAll}
+                            onClearAll={handleClearAll}
+                        />
+
+                        {/* View Mode Toggle */}
+                        <div className="bg-white rounded-xl shadow-lg p-6 mb-8">
+                            <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center">
+                                <span className="text-telus-purple mr-2">👁️</span>
+                                View Mode
+                            </h3>
+                            <div className="flex gap-2">
+                                <button
+                                    onClick={() => setViewMode('overview')}
+                                    className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                                        viewMode === 'overview' 
+                                            ? 'bg-telus-purple text-white' 
+                                            : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                                    }`}
+                                >
+                                    Sprint Overview
+                                </button>
+                                <button
+                                    onClick={() => setViewMode('detailed')}
+                                    className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                                        viewMode === 'detailed' 
+                                            ? 'bg-telus-purple text-white' 
+                                            : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                                    }`}
+                                >
+                                    Detailed Table
+                                </button>
+                                <button
+                                    onClick={() => setViewMode('aggregated')}
+                                    className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                                        viewMode === 'aggregated' 
+                                            ? 'bg-telus-purple text-white' 
+                                            : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                                    }`}
+                                >
+                                    Aggregated Performance
+                                </button>
+                            </div>
+                        </div>
+
+                        {/* Summary Cards */}
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7 gap-6 mb-12">
+                            <SummaryCard 
+                                title="Selected Sprints" 
+                                value={aggregatedStats.totalSprints} 
+                                icon="🎯" 
+                                color="telus-purple"
+                            />
+                            <SummaryCard 
+                                title="Total Developers" 
+                                value={aggregatedStats.totalDevelopers} 
+                                icon="👥" 
+                                color="telus-blue"
+                            />
+                            <SummaryCard 
+                                title="Total Commits" 
+                                value={aggregatedStats.totalCommits} 
+                                icon="💻" 
+                                color="telus-green"
+                            />
+                            <SummaryCard 
+                                title="Issues Assigned" 
+                                value={aggregatedStats.totalIssuesAssigned} 
+                                icon="📋" 
+                                color="telus-blue"
+                            />
+                            <SummaryCard 
+                                title="Issues Closed" 
+                                value={aggregatedStats.totalIssuesClosed} 
+                                icon="✅" 
+                                color="telus-green"
+                            />
+                            <SummaryCard 
+                                title="Story Points" 
+                                value={aggregatedStats.totalStoryPoints} 
+                                icon="⭐" 
+                                color="telus-light-purple"
+                            />
+                            <SummaryCard 
+                                title="Completion Rate" 
+                                value={`${aggregatedStats.avgCompletionRate}%`} 
+                                icon="📊" 
+                                color="telus-purple"
+                            />
+                        </div>
+
+                        {/* Content based on view mode */}
+                        {viewMode === 'overview' && (
+                            <div>
+                                <h2 className="text-3xl font-bold text-gray-800 mb-8 telus-gradient">
+                                    🎯 Sprint Overview
+                                </h2>
+                                {filteredSprints.length === 0 ? (
+                                    <div className="bg-white rounded-xl shadow-lg p-12 text-center">
+                                        <p className="text-gray-500 text-lg">No sprints selected. Please select sprints from the filter above.</p>
+                                    </div>
+                                ) : (
+                                    <div className="space-y-8">
+                                        {filteredSprints.map((sprint) => (
+                                            <div key={sprint.key}>
+                                                <SprintOverviewCard sprint={{
+                                                    sprint_info: sprint.info,
+                                                    developers: sprint.developers
+                                                }} />
+                                                
+                                                {/* Developer cards for this sprint */}
+                                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 mb-8">
+                                                    {Object.entries(sprint.developers).map(([name, dev]) => (
+                                                        <DeveloperPerformanceCard 
+                                                            key={`${sprint.key}-${name}`}
+                                                            developer={dev}
+                                                            developerName={name}
+                                                            sprintName={sprint.info.name}
+                                                        />
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+                        )}
+
+                        {viewMode === 'detailed' && (
+                            <div>
+                                <h2 className="text-3xl font-bold text-gray-800 mb-8 telus-gradient">
+                                    📊 Detailed Performance Table
+                                </h2>
+                                {flattenedDevelopers.length === 0 ? (
+                                    <div className="bg-white rounded-xl shadow-lg p-12 text-center">
+                                        <p className="text-gray-500 text-lg">No data available. Please select sprints from the filter above.</p>
+                                    </div>
+                                ) : (
+                                    <SprintPerformanceTable 
+                                        sprints={filteredSprints}
+                                        developers={flattenedDevelopers}
+                                    />
+                                )}
+                            </div>
+                        )}
+
+                        {viewMode === 'aggregated' && (
+                            <div>
+                                <h2 className="text-3xl font-bold text-gray-800 mb-8 telus-gradient">
+                                    👨‍💻 Aggregated Developer Performance
+                                </h2>
+                                {flattenedDevelopers.length === 0 ? (
+                                    <div className="bg-white rounded-xl shadow-lg p-12 text-center">
+                                        <p className="text-gray-500 text-lg">No data available. Please select sprints from the filter above.</p>
+                                    </div>
+                                ) : (
+                                    <AggregatedDeveloperPerformance developers={flattenedDevelopers} />
+                                )}
+                            </div>
+                        )}
+
+                        {/* Explanation Section */}
+                        <div className="mt-16 bg-gradient-to-r from-blue-50 to-purple-50 rounded-xl p-6 border-l-4 border-telus-blue">
+                            <h3 className="text-lg font-semibold text-gray-800 mb-3 flex items-center">
+                                <span className="text-telus-blue mr-2">📋</span>
+                                Sprint Analytics Explanation
+                            </h3>
+                            <div className="text-sm text-gray-700 space-y-2">
+                                <p><strong>Sprint Overview:</strong> Shows individual sprint performance with developer cards grouped by sprint.</p>
+                                <p><strong>Detailed Table:</strong> Comprehensive table view showing all developer activities across selected sprints.</p>
+                                <p><strong>Aggregated Performance:</strong> Developer performance aggregated across all selected sprints with averages and totals.</p>
+                                <p><strong>Commits in Sprint:</strong> Git commits made during the sprint timeframe (between start and end dates).</p>
+                                <p><strong>Issues Assigned:</strong> JIRA issues assigned to the developer that are associated with the sprint.</p>
+                                <p><strong>Issues Closed:</strong> Issues completed during the sprint period with 'Done' status.</p>
+                                <p><strong>Story Points:</strong> Total story points for completed issues during the sprint.</p>
+                            </div>
+                        </div>
+
+                        {/* Footer */}
+                        <div className="mt-16 text-center text-gray-600">
+                            <p className="text-sm">
+                                🎯 Sprint Analytics Dashboard • Built with React & TailwindCSS
+                            </p>
+                            <p className="text-xs mt-2 opacity-75">
+                                Data reflects sprint-based performance metrics across JIRA issues, Git commits, and sprint metadata
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        // Embedded data as fallback
+        const embeddedData = {
+            "generated_at": "2025-09-22T22:29:09.918341",
+            "sprint_analytics": {
+                "sample_sprint": {
+                    "sprint_info": {
+                        "id": "12345",
+                        "name": "Sample Sprint 1",
+                        "state": "closed",
+                        "start_date": "2025-09-01T00:00:00.000Z",
+                        "end_date": "2025-09-15T00:00:00.000Z"
+                    },
+                    "developers": {
+                        "Sample Developer": {
+                            "name": "Sample Developer",
+                            "email": "sample@telus.com",
+                            "commits_in_sprint": 5,
+                            "issues_assigned_in_sprint": 3,
+                            "issues_closed_in_sprint": 2,
+                            "story_points_closed_in_sprint": 8.0
+                        }
+                    }
+                }
+            }
+        };
+
+        // Render the Dashboard
+        ReactDOM.render(<Dashboard />, document.getElementById('root'));
+    </script>
+</body>
+</html>
