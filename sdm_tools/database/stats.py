@@ -13,25 +13,30 @@ console = Console()
 
 
 def extract_issue_code_from_watches(watches_data):
-    """Extract issue code (SET-X) from watches field JSON data."""
+    """Extract issue code (SET-XXXXX) from watches field JSON data."""
     if not watches_data:
         return None
 
     try:
-        # Parse the JSON string
-        watches_json = json.loads(watches_data)
+        # Parse the JSON string (it's stored as a string representation of a Python dict)
+        import ast
+        watches_dict = ast.literal_eval(watches_data)
 
         # Extract the 'self' URL
-        if 'self' in watches_json:
-            url = watches_json['self']
-            # Split by '/' and get the last part which should be the issue code
+        if 'self' in watches_dict:
+            url = watches_dict['self']
+            # Split by '/' and get the part before '/watchers'
             parts = url.split('/')
             if len(parts) >= 2:
-                issue_code = parts[-1]
-                # Validate it looks like SET-X format
-                if issue_code.startswith('SET-') and issue_code.count('-') == 1:
-                    return issue_code
-    except (json.JSONDecodeError, AttributeError, TypeError) as e:
+                # Look for the issue code in the URL path
+                for part in parts:
+                    if part.startswith('SET-') and len(part) > 4:
+                        # Validate it looks like SET-XXXXX format (SET- followed by digits)
+                        # Get part after 'SET-'
+                        issue_part = part.split('-', 1)[1]
+                        if issue_part.isdigit():
+                            return part
+    except (ValueError, AttributeError, TypeError, SyntaxError) as e:
         # If parsing fails, return None
         pass
 
@@ -618,8 +623,11 @@ def generate_basic_stats_json():
         developer_basic_stats = {}
 
         for assignee in filtered_assignees:
+            # Extract clean name for display
+            name, email = extract_developer_info(assignee)
+
             stats = {
-                "name": assignee,
+                "name": name,
                 "total_commits": 0,
                 "total_jira_updates": 0,
                 "total_story_points_closed": 0
@@ -642,7 +650,8 @@ def generate_basic_stats_json():
             issue_codes = get_issue_codes_for_assignee(cursor, assignee)
             stats["issue_codes"] = issue_codes
 
-            developer_basic_stats[assignee] = stats
+            # Use the clean name as the key instead of the full JSON string
+            developer_basic_stats[name] = stats
 
         # Create final JSON structure
         final_json = {
