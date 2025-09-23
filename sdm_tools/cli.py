@@ -6,7 +6,7 @@ from .utils import clear_screen, print_banner, console
 from .jira import fetch_issue_ids, fetch_issue_details
 from .database import (
     store_issues_in_db, display_issues, update_git_commits, display_commits,
-    generate_developer_stats_json
+    generate_developer_stats_json, generate_sprint_stats_json, display_existing_sprint_stats
 )
 from .database.stats import generate_basic_stats_json, display_existing_basic_stats
 from .config import DB_NAME, TABLE_NAME, BASIC_STATS
@@ -249,6 +249,54 @@ def handle_basic_stats_option():
             input("Press Enter to return to the menu...")
 
 
+def handle_sprint_analytics_option():
+    """Handle the sprint analytics option (display or generate JSON with sprint stats)."""
+    sprint_stats_file = "ux/web/data/team_sprint_stats.json"
+
+    # Check if sprint stats file already exists
+    if os.path.exists(sprint_stats_file):
+        # Data exists, ask if user wants to update or just display
+        update_choice = console.input(
+            "[bold yellow]Sprint analytics file already exists. Do you want to update it? (y/N): [/bold yellow]").strip().lower()
+
+        if update_choice == 'y' or update_choice == 'yes':
+            # User wants to update
+            console.print(
+                "[bold yellow]Generating updated sprint analytics from Jira issues, git commits, and sprint data...[/bold yellow]")
+            try:
+                json_filename = generate_sprint_stats_json()
+                if not json_filename:
+                    console.print(
+                        "[bold red]Failed to generate sprint analytics.[/bold red]")
+                    input("Press Enter to return to the menu...")
+            except Exception as e:
+                console.print(
+                    f"[bold red]Error generating sprint analytics: {str(e)}[/bold red]")
+                input("Press Enter to return to the menu...")
+        else:
+            # User wants to just display existing data
+            try:
+                display_existing_sprint_stats()
+            except Exception as e:
+                console.print(
+                    f"[bold red]Error displaying existing sprint analytics: {str(e)}[/bold red]")
+                input("Press Enter to return to the menu...")
+    else:
+        # No data exists, generate it
+        console.print(
+            "[bold yellow]No sprint analytics file found. Generating from Jira issues, git commits, and sprint data...[/bold yellow]")
+        try:
+            json_filename = generate_sprint_stats_json()
+            if not json_filename:
+                console.print(
+                    "[bold red]Failed to generate sprint analytics.[/bold red]")
+                input("Press Enter to return to the menu...")
+        except Exception as e:
+            console.print(
+                f"[bold red]Error generating sprint analytics: {str(e)}[/bold red]")
+            input("Press Enter to return to the menu...")
+
+
 def handle_html_generation_option():
     """Handle the HTML generation option - creates self-sufficient HTML dashboards for all HTML files in ux/web."""
     import json
@@ -412,11 +460,13 @@ def manage_issues():
         console.print(
             "[bold cyan]4. Team simple stats JSON (update/display)[/bold cyan]")
         console.print(
-            "[bold cyan]5. Generate self-sufficient HTML dashboard[/bold cyan]")
-        console.print("[bold cyan]6. Exit[/bold cyan]")
+            "[bold cyan]5. Team sprint analytics JSON (update/display)[/bold cyan]")
+        console.print(
+            "[bold cyan]6. Generate self-sufficient HTML dashboard[/bold cyan]")
+        console.print("[bold cyan]7. Exit[/bold cyan]")
 
         choice = console.input(
-            "[bold green]Enter your choice (1/2/3/4/5/6): [/bold green]")
+            "[bold green]Enter your choice (1/2/3/4/5/6/7): [/bold green]")
 
         if choice == '1':
             handle_issues_option()
@@ -427,8 +477,10 @@ def manage_issues():
         elif choice == '4':
             handle_developer_stats_option()
         elif choice == '5':
-            handle_html_generation_option()
+            handle_sprint_analytics_option()
         elif choice == '6':
+            handle_html_generation_option()
+        elif choice == '7':
             console.print("[bold red]Exiting SDM Tools.[/bold red]")
             break
         else:

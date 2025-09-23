@@ -1053,3 +1053,357 @@ def display_existing_basic_stats():
         console.print(
             f"[bold red]Error reading basic statistics file: {str(e)}[/bold red]")
         input("Press Enter to return to the menu...")
+
+
+def generate_sprint_stats_json():
+    """Generates a JSON file with sprint-based developer statistics combining issues, commits, and sprints data."""
+    sprint_stats_file = "ux/web/data/team_sprint_stats.json"
+
+    if not os.path.exists(DB_NAME):
+        console.print(
+            "[bold red]Database does not exist. Please update issues and commits first.[/bold red]")
+        input("Press Enter to return to the menu...")
+        return None
+
+    with sqlite3.connect(DB_NAME) as conn:
+        cursor = conn.cursor()
+
+        # Check if all required tables exist
+        required_tables = [TABLE_NAME, 'git_commits', f'{TABLE_NAME}_sprints']
+        for table in required_tables:
+            cursor.execute(
+                f"SELECT name FROM sqlite_master WHERE type='table' AND name='{table}'")
+            if not cursor.fetchone():
+                console.print(
+                    f"[bold red]Required table '{table}' not found. Please ensure all data is loaded.[/bold red]")
+                input("Press Enter to return to the menu...")
+                return None
+
+        # Get all sprints
+        cursor.execute(
+            f"SELECT id, name, state, startDate, endDate FROM {TABLE_NAME}_sprints ORDER BY startDate")
+        sprints = cursor.fetchall()
+
+        if not sprints:
+            console.print(
+                "[bold red]No sprints found in the database.[/bold red]")
+            input("Press Enter to return to the menu...")
+            return None
+
+        # Get all assignees from Jira issues (excluding empty/null assignees)
+        cursor.execute(f"""
+            SELECT DISTINCT assignee 
+            FROM {TABLE_NAME} 
+            WHERE assignee IS NOT NULL AND assignee != '' AND assignee != 'null'
+        """)
+        assignees = [row[0] for row in cursor.fetchall()]
+
+        # Filter out excluded emails
+        filtered_assignees = []
+        for assignee in assignees:
+            _, email = extract_developer_info(assignee)
+            if not should_exclude_email(email):
+                filtered_assignees.append(assignee)
+
+        if not filtered_assignees:
+            console.print(
+                "[bold red]No assignees found after filtering excluded emails.[/bold red]")
+            input("Press Enter to return to the menu...")
+            return None
+
+        sprint_analytics = {}
+
+        for sprint_id, sprint_name, sprint_state, start_date, end_date in sprints:
+            sprint_key = f"{sprint_id}_{sprint_name.replace(' ', '_')}"
+
+            sprint_analytics[sprint_key] = {
+                "sprint_info": {
+                    "id": sprint_id,
+                    "name": sprint_name,
+                    "state": sprint_state,
+                    "start_date": start_date,
+                    "end_date": end_date
+                },
+                "developers": {}
+            }
+
+            # Get stats for each developer in this sprint
+            for assignee in filtered_assignees:
+                name, email = extract_developer_info(assignee)
+
+                # Get sprint-specific stats for this developer
+                sprint_stats = get_sprint_stats_for_developer(
+                    cursor, assignee, sprint_id, start_date, end_date)
+
+                # Only include developers who have activity in this sprint
+                if (sprint_stats["commits_in_sprint"] > 0 or
+                    sprint_stats["issues_assigned_in_sprint"] > 0 or
+                        sprint_stats["issues_closed_in_sprint"] > 0):
+
+                    sprint_analytics[sprint_key]["developers"][name] = {
+                        "name": name,
+                        "email": email,
+                        "commits_in_sprint": sprint_stats["commits_in_sprint"],
+                        "issues_assigned_in_sprint": sprint_stats["issues_assigned_in_sprint"],
+                        "issues_closed_in_sprint": sprint_stats["issues_closed_in_sprint"],
+                        "story_points_closed_in_sprint": sprint_stats["story_points_closed_in_sprint"]
+                    }
+
+        # Create final JSON structure
+        final_json = {
+            "generated_at": datetime.now().isoformat(),
+            "sprint_analytics": sprint_analytics
+        }
+
+        # Backup existing file if it exists
+        if os.path.exists(sprint_stats_file):
+            timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+            stats_dir = os.path.dirname(sprint_stats_file)
+            backup_filename = os.path.join(
+                stats_dir, f"team_sprint_stats_backup_{timestamp}.json")
+            shutil.copy2(sprint_stats_file, backup_filename)
+            console.print(
+                f"[bold yellow]Existing sprint stats file backed up to: {backup_filename}[/bold yellow]")
+
+        # Ensure directory exists
+        os.makedirs(os.path.dirname(sprint_stats_file), exist_ok=True)
+
+        # Write to sprint stats JSON file
+        with open(sprint_stats_file, 'w') as f:
+            json.dump(final_json, f, indent=2, default=str)
+
+        # Display summary
+        display_sprint_stats_summary(sprint_analytics)
+
+        console.print(
+            f"\n[bold green]Sprint statistics file created: {sprint_stats_file}[/bold green]")
+
+        input("\nPress Enter to return to the menu...")
+        return sprint_stats_file
+
+
+def get_sprint_stats_for_developer(cursor, assignee, sprint_id, start_date, end_date):
+    """Get sprint-specific statistics for a developer."""
+    from datetime import datetime
+
+    stats = {
+        "commits_in_sprint": 0,
+        "issues_assigned_in_sprint": 0,
+        "issues_closed_in_sprint": 0,
+        "story_points_closed_in_sprint": 0
+    }
+
+    # Extract developer info
+    try:
+        import ast
+        assignee_dict = ast.literal_eval(assignee)
+        assignee_email = assignee_dict.get('emailAddress', '')
+        assignee_name = assignee_dict.get('displayName', '')
+    except:
+        assignee_email = ''
+        assignee_name = assignee
+
+    # Parse sprint dates
+    try:
+        if start_date:
+            sprint_start = datetime.fromisoformat(
+                start_date.replace('Z', '+00:00'))
+        else:
+            sprint_start = None
+
+        if end_date:
+            sprint_end = datetime.fromisoformat(
+                end_date.replace('Z', '+00:00'))
+        else:
+            sprint_end = None
+    except:
+        sprint_start = None
+        sprint_end = None
+
+    # 1. Get commits during sprint period
+    if sprint_start and sprint_end and (assignee_email or assignee_name):
+        search_conditions = []
+        search_params = []
+
+        if assignee_email:
+            search_conditions.append("author_email = ?")
+            search_params.append(assignee_email)
+        if assignee_name:
+            search_conditions.append("author_name = ?")
+            search_params.append(assignee_name)
+
+        where_clause = " OR ".join(search_conditions)
+
+        cursor.execute(f"""
+            SELECT COUNT(DISTINCT hash) 
+            FROM git_commits 
+            WHERE ({where_clause}) AND date IS NOT NULL
+        """, search_params)
+
+        all_commits = cursor.fetchall()
+
+        # Filter commits by date range
+        cursor.execute(f"""
+            SELECT DISTINCT date 
+            FROM git_commits 
+            WHERE ({where_clause}) AND date IS NOT NULL
+        """, search_params)
+
+        commit_dates = cursor.fetchall()
+        commits_in_range = 0
+
+        for (date_str,) in commit_dates:
+            try:
+                # Parse git date format and check if it's in sprint range
+                import re
+                date_clean = re.sub(r'\s+[+-]\d{4}$', '', date_str)
+                commit_date = datetime.strptime(
+                    date_clean, '%a %b %d %H:%M:%S %Y')
+
+                if sprint_start <= commit_date <= sprint_end:
+                    commits_in_range += 1
+            except:
+                continue
+
+        stats["commits_in_sprint"] = commits_in_range
+
+    # 2. Get issues assigned to developer that are in this sprint
+    cursor.execute(f"""
+        SELECT COUNT(*) 
+        FROM {TABLE_NAME} 
+        WHERE assignee = ? AND customfield_10020 LIKE ?
+    """, (assignee, f'%{sprint_id}%'))
+
+    stats["issues_assigned_in_sprint"] = cursor.fetchone()[0]
+
+    # 3. Get issues closed during sprint period
+    closed_statuses = ["Done", "Closed", "Resolved", "Complete", "Completed"]
+    status_placeholders = ','.join(['?' for _ in closed_statuses])
+
+    if sprint_start and sprint_end:
+        sprint_start_str = sprint_start.isoformat()
+        sprint_end_str = sprint_end.isoformat()
+
+        cursor.execute(f"""
+            SELECT COUNT(*) 
+            FROM {TABLE_NAME} 
+            WHERE assignee = ? 
+            AND customfield_10020 LIKE ?
+            AND status IN ({status_placeholders})
+            AND updated >= ? AND updated <= ?
+        """, (assignee, f'%{sprint_id}%', *closed_statuses, sprint_start_str, sprint_end_str))
+
+        stats["issues_closed_in_sprint"] = cursor.fetchone()[0]
+
+        # 4. Get story points for closed issues in sprint
+        cursor.execute(f"""
+            SELECT SUM(CAST(customfield_10026 AS REAL)) 
+            FROM {TABLE_NAME} 
+            WHERE assignee = ? 
+            AND customfield_10020 LIKE ?
+            AND status IN ({status_placeholders})
+            AND updated >= ? AND updated <= ?
+            AND customfield_10026 IS NOT NULL AND customfield_10026 != ''
+        """, (assignee, f'%{sprint_id}%', *closed_statuses, sprint_start_str, sprint_end_str))
+
+        result = cursor.fetchone()[0]
+        stats["story_points_closed_in_sprint"] = round(
+            result, 1) if result else 0
+    else:
+        # If no date range, just check for closed issues in the sprint
+        cursor.execute(f"""
+            SELECT COUNT(*) 
+            FROM {TABLE_NAME} 
+            WHERE assignee = ? 
+            AND customfield_10020 LIKE ?
+            AND status IN ({status_placeholders})
+        """, (assignee, f'%{sprint_id}%', *closed_statuses))
+
+        stats["issues_closed_in_sprint"] = cursor.fetchone()[0]
+
+        cursor.execute(f"""
+            SELECT SUM(CAST(customfield_10026 AS REAL)) 
+            FROM {TABLE_NAME} 
+            WHERE assignee = ? 
+            AND customfield_10020 LIKE ?
+            AND status IN ({status_placeholders})
+            AND customfield_10026 IS NOT NULL AND customfield_10026 != ''
+        """, (assignee, f'%{sprint_id}%', *closed_statuses))
+
+        result = cursor.fetchone()[0]
+        stats["story_points_closed_in_sprint"] = round(
+            result, 1) if result else 0
+
+    return stats
+
+
+def display_sprint_stats_summary(sprint_analytics):
+    """Display a summary table of sprint statistics."""
+    console.print("\n[bold yellow]Sprint Analytics Summary:[/bold yellow]")
+
+    for sprint_key, sprint_data in sprint_analytics.items():
+        sprint_info = sprint_data["sprint_info"]
+        developers = sprint_data["developers"]
+
+        if not developers:
+            continue
+
+        console.print(
+            f"\n[bold cyan]Sprint: {sprint_info['name']} ({sprint_info['state']})[/bold cyan]")
+
+        table = Table(show_header=True, header_style="bold green")
+        table.add_column("Developer")
+        table.add_column("Commits")
+        table.add_column("Issues Assigned")
+        table.add_column("Issues Closed")
+        table.add_column("Story Points Closed")
+
+        for dev_name, dev_stats in developers.items():
+            table.add_row(
+                dev_stats["name"],
+                str(dev_stats["commits_in_sprint"]),
+                str(dev_stats["issues_assigned_in_sprint"]),
+                str(dev_stats["issues_closed_in_sprint"]),
+                str(dev_stats["story_points_closed_in_sprint"])
+            )
+
+        console.print(table)
+
+
+def display_existing_sprint_stats():
+    """Display existing sprint statistics from the JSON file."""
+    sprint_stats_file = "ux/web/data/team_sprint_stats.json"
+
+    if not os.path.exists(sprint_stats_file):
+        console.print(
+            f"[bold red]No sprint statistics file found: {sprint_stats_file}[/bold red]")
+        input("Press Enter to return to the menu...")
+        return
+
+    try:
+        with open(sprint_stats_file, 'r') as f:
+            stats_data = json.load(f)
+
+        sprint_analytics = stats_data.get("sprint_analytics", {})
+        if not sprint_analytics:
+            console.print(
+                "[bold red]No sprint analytics found in the file.[/bold red]")
+            input("Press Enter to return to the menu...")
+            return
+
+        # Display the sprint analytics
+        display_sprint_stats_summary(sprint_analytics)
+
+        # Show file info
+        generated_at = stats_data.get("generated_at", "Unknown")
+        console.print(
+            f"\n[bold green]Sprint statistics loaded from: {sprint_stats_file}[/bold green]")
+        console.print(
+            f"[bold yellow]Generated at: {generated_at}[/bold yellow]")
+
+        input("\nPress Enter to return to the menu...")
+
+    except Exception as e:
+        console.print(
+            f"[bold red]Error reading sprint statistics file: {str(e)}[/bold red]")
+        input("Press Enter to return to the menu...")
