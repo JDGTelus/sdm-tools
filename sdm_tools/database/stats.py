@@ -1245,6 +1245,10 @@ def get_sprint_stats_for_developer(cursor, assignee, sprint_id, start_date, end_
 
         where_clause = " OR ".join(search_conditions)
 
+        # Convert sprint dates to date-only format for comparison
+        sprint_start_date = sprint_start.date()  # Convert to date object (YYYY-MM-DD)
+        sprint_end_date = sprint_end.date()      # Convert to date object (YYYY-MM-DD)
+
         # Get all commits with dates for this developer
         cursor.execute(f"""
             SELECT DISTINCT hash, date 
@@ -1257,27 +1261,35 @@ def get_sprint_stats_for_developer(cursor, assignee, sprint_id, start_date, end_
 
         for hash_val, date_str in commit_data:
             try:
-                # Parse git date format: "Wed Sep 17 23:37:12 2025 +0000" or similar
-                # Remove timezone info and parse
+                # Parse git date format: "Fri Sep 19 15:06:43 2025 -0600"
+                # Remove timezone info first
                 date_clean = re.sub(r'\s+[+-]\d{4}$', '', date_str.strip())
 
-                # Try different date formats
-                commit_date = None
-                date_formats = [
-                    '%a %b %d %H:%M:%S %Y',  # Wed Sep 17 23:37:12 2025
-                    '%Y-%m-%d %H:%M:%S',     # 2025-09-17 23:37:12
-                    '%Y-%m-%d',              # 2025-09-17
-                ]
-
-                for fmt in date_formats:
+                # Parse the git date format
+                commit_datetime = None
+                try:
+                    # Git format: "Fri Sep 19 15:06:43 2025"
+                    commit_datetime = datetime.strptime(
+                        date_clean, '%a %b %d %H:%M:%S %Y')
+                except ValueError:
+                    # Try alternative formats if needed
                     try:
-                        commit_date = datetime.strptime(date_clean, fmt)
-                        break
+                        commit_datetime = datetime.strptime(
+                            date_clean, '%Y-%m-%d %H:%M:%S')
                     except ValueError:
-                        continue
+                        try:
+                            commit_datetime = datetime.strptime(
+                                date_clean, '%Y-%m-%d')
+                        except ValueError:
+                            continue
 
-                if commit_date and sprint_start <= commit_date <= sprint_end:
-                    commits_in_range += 1
+                if commit_datetime:
+                    # Convert commit datetime to date-only for comparison
+                    commit_date = commit_datetime.date()
+
+                    # Compare date-only values (no time component)
+                    if sprint_start_date <= commit_date <= sprint_end_date:
+                        commits_in_range += 1
 
             except Exception as e:
                 # Skip commits with unparseable dates
