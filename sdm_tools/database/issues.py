@@ -28,6 +28,12 @@ def store_issues_in_db(issues):
                 VALUES (?, {', '.join(['?'] * len(fields.keys()))})
             ''', values)
 
+    # After storing issues, automatically process sprint data
+    console.print(
+        "[bold cyan]Processing sprint data from issues...[/bold cyan]")
+    from .sprints import process_sprints_from_issues
+    process_sprints_from_issues()
+
 
 def display_table_data(conn, table_name, columns):
     """Displays data from a specified table in a formatted table."""
