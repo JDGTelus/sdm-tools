@@ -6,10 +6,9 @@ from .utils import clear_screen, print_banner, console
 from .jira import fetch_issue_ids, fetch_issue_details
 from .database import (
     store_issues_in_db, display_issues, update_git_commits, display_commits,
-    generate_developer_stats_json, generate_sprint_stats_json, display_existing_sprint_stats
+    generate_sprint_stats_json, display_existing_sprint_stats
 )
-from .database.stats import generate_basic_stats_json, display_existing_basic_stats
-from .config import DB_NAME, TABLE_NAME, BASIC_STATS
+from .config import DB_NAME, TABLE_NAME
 
 
 @click.group(invoke_without_command=True)
@@ -144,111 +143,6 @@ def handle_commits_option():
             input("Press Enter to return to the menu...")
 
 
-def handle_developer_stats_option():
-    """Handle the developer stats option (display or generate JSON with stats)."""
-    import os
-    from .database.stats import display_existing_stats
-    from .config import SIMPLE_STATS
-
-    # Check if stats file already exists
-    if os.path.exists(SIMPLE_STATS):
-        # Data exists, ask if user wants to update or just display
-        update_choice = console.input(
-            "[bold yellow]Developer statistics file already exists. Do you want to update it? (y/N): [/bold yellow]").strip().lower()
-
-        if update_choice == 'y' or update_choice == 'yes':
-            # User wants to update
-            console.print(
-                "[bold yellow]Generating updated developer statistics from Jira issues and git commits...[/bold yellow]")
-            try:
-                json_filename = generate_developer_stats_json()
-                if not json_filename:
-                    console.print(
-                        "[bold red]Failed to generate developer statistics.[/bold red]")
-                    input("Press Enter to return to the menu...")
-            except Exception as e:
-                console.print(
-                    f"[bold red]Error generating developer statistics: {str(e)}[/bold red]")
-                try:
-                    input("Press Enter to return to the menu...")
-                except EOFError:
-                    pass
-        else:
-            # User wants to just display existing data
-            try:
-                display_existing_stats()
-            except Exception as e:
-                console.print(
-                    f"[bold red]Error displaying existing statistics: {str(e)}[/bold red]")
-                input("Press Enter to return to the menu...")
-    else:
-        # No data exists, generate it
-        console.print(
-            "[bold yellow]No developer statistics file found. Generating from Jira issues and git commits...[/bold yellow]")
-        try:
-            json_filename = generate_developer_stats_json()
-            if not json_filename:
-                console.print(
-                    "[bold red]Failed to generate developer statistics.[/bold red]")
-                input("Press Enter to return to the menu...")
-        except Exception as e:
-            console.print(
-                f"[bold red]Error generating developer statistics: {str(e)}[/bold red]")
-            input("Press Enter to return to the menu...")
-
-
-def handle_basic_stats_option():
-    """Handle the basic stats option (display or generate JSON with time-based stats)."""
-    if not BASIC_STATS:
-        console.print(
-            "[bold red]BASIC_STATS environment variable is not set. Please configure it in your .env file.[/bold red]")
-        input("Press Enter to return to the menu...")
-        return
-
-    # Check if basic stats file already exists
-    if os.path.exists(BASIC_STATS):
-        # Data exists, ask if user wants to update or just display
-        update_choice = console.input(
-            f"[bold yellow]Basic statistics file ({BASIC_STATS}) already exists. Do you want to update it? (y/N): [/bold yellow]").strip().lower()
-
-        if update_choice == 'y' or update_choice == 'yes':
-            # User wants to update
-            console.print(
-                "[bold yellow]Generating updated basic statistics from Jira issues and git commits...[/bold yellow]")
-            try:
-                json_filename = generate_basic_stats_json()
-                if not json_filename:
-                    console.print(
-                        "[bold red]Failed to generate basic statistics.[/bold red]")
-                    input("Press Enter to return to the menu...")
-            except Exception as e:
-                console.print(
-                    f"[bold red]Error generating basic statistics: {str(e)}[/bold red]")
-                input("Press Enter to return to the menu...")
-        else:
-            # User wants to just display existing data
-            try:
-                display_existing_basic_stats()
-            except Exception as e:
-                console.print(
-                    f"[bold red]Error displaying existing basic statistics: {str(e)}[/bold red]")
-                input("Press Enter to return to the menu...")
-    else:
-        # No data exists, generate it
-        console.print(
-            f"[bold yellow]No basic statistics file found ({BASIC_STATS}). Generating from Jira issues and git commits...[/bold yellow]")
-        try:
-            json_filename = generate_basic_stats_json()
-            if not json_filename:
-                console.print(
-                    "[bold red]Failed to generate basic statistics.[/bold red]")
-                input("Press Enter to return to the menu...")
-        except Exception as e:
-            console.print(
-                f"[bold red]Error generating basic statistics: {str(e)}[/bold red]")
-            input("Press Enter to return to the menu...")
-
-
 def handle_sprint_analytics_option():
     """Handle the sprint analytics option (display or generate JSON with sprint stats)."""
     sprint_stats_file = "ux/web/data/team_sprint_stats.json"
@@ -303,7 +197,6 @@ def handle_html_generation_option():
     import glob
     from datetime import datetime
     import shutil
-    from .config import SIMPLE_STATS
 
     console.print(
         "[bold yellow]Generating self-sufficient HTML dashboards...[/bold yellow]")
@@ -346,28 +239,20 @@ def handle_html_generation_option():
                     f"[bold cyan]Processing {filename}...[/bold cyan]")
 
                 # Determine which JSON file to use based on HTML filename
-                if "basic" in filename.lower():
-                    if not BASIC_STATS or not os.path.exists(BASIC_STATS):
-                        console.print(
-                            f"[bold yellow]Skipping {filename} - Basic statistics file not found at {BASIC_STATS}.[/bold yellow]")
-                        continue
-                    json_file = BASIC_STATS
+                json_file = None
+                if "sprint" in filename.lower():
+                    json_file = "ux/web/data/team_sprint_stats.json"
+                elif "basic" in filename.lower():
+                    json_file = "ux/web/data/team_basic_stats.json"
                 elif "simple" in filename.lower():
-                    if not SIMPLE_STATS or not os.path.exists(SIMPLE_STATS):
-                        console.print(
-                            f"[bold yellow]Skipping {filename} - Simple statistics file not found at {SIMPLE_STATS}.[/bold yellow]")
-                        continue
-                    json_file = SIMPLE_STATS
-                elif "sprint" in filename.lower():
-                    sprint_stats_file = "ux/web/data/team_sprint_stats.json"
-                    if not os.path.exists(sprint_stats_file):
-                        console.print(
-                            f"[bold yellow]Skipping {filename} - Sprint statistics file not found at {sprint_stats_file}.[/bold yellow]")
-                        continue
-                    json_file = sprint_stats_file
+                    json_file = "ux/web/data/team_simple_stats.json"
                 else:
+                    # Default to sprint stats if no specific pattern matches
+                    json_file = "ux/web/data/team_sprint_stats.json"
+
+                if not os.path.exists(json_file):
                     console.print(
-                        f"[bold yellow]Skipping {filename} - Cannot determine which JSON file to use.[/bold yellow]")
+                        f"[bold yellow]Skipping {filename} - Data file not found at {json_file}.[/bold yellow]")
                     continue
 
                 # Define the target filename
@@ -463,31 +348,23 @@ def manage_issues():
         console.print(
             "[bold cyan]2. Manage git commits (get/update/display)[/bold cyan]")
         console.print(
-            "[bold cyan]3. Team basic stats JSON (update/display)[/bold cyan]")
+            "[bold cyan]3. Team sprint analytics JSON (update/display)[/bold cyan]")
         console.print(
-            "[bold cyan]4. Team simple stats JSON (update/display)[/bold cyan]")
-        console.print(
-            "[bold cyan]5. Team sprint analytics JSON (update/display)[/bold cyan]")
-        console.print(
-            "[bold cyan]6. Generate self-sufficient HTML dashboard[/bold cyan]")
-        console.print("[bold cyan]7. Exit[/bold cyan]")
+            "[bold cyan]4. Generate self-sufficient HTML dashboard[/bold cyan]")
+        console.print("[bold cyan]5. Exit[/bold cyan]")
 
         choice = console.input(
-            "[bold green]Enter your choice (1/2/3/4/5/6/7): [/bold green]")
+            "[bold green]Enter your choice (1/2/3/4/5): [/bold green]")
 
         if choice == '1':
             handle_issues_option()
         elif choice == '2':
             handle_commits_option()
         elif choice == '3':
-            handle_basic_stats_option()
-        elif choice == '4':
-            handle_developer_stats_option()
-        elif choice == '5':
             handle_sprint_analytics_option()
-        elif choice == '6':
+        elif choice == '4':
             handle_html_generation_option()
-        elif choice == '7':
+        elif choice == '5':
             console.print("[bold red]Exiting SDM Tools.[/bold red]")
             break
         else:
