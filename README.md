@@ -12,17 +12,17 @@ SDM-Tools is a comprehensive command-line interface (CLI) tool designed for Soft
 - **Pagination**: Display large datasets with colorful, paginated output
 
 ### Advanced Analytics
-- **Team Statistics**: Generate comprehensive team statistics in JSON format
-- **Time-based Metrics**: Track activity over 1, 3, and 7-day periods
-- **Story Points Tracking**: Monitor story points closed by developers
+- **Sprint Analytics**: Generate comprehensive sprint-based team statistics in JSON format
+- **Story Points Tracking**: Monitor story points closed by developers across sprints
 - **Issue Code Extraction**: Automatically extract and display issue codes from Jira data
-- **Productivity Scoring**: Calculate productivity scores based on commits and issues
+- **Sprint Progress Tracking**: Track sprint completion rates and developer contributions
+- **Commit Integration**: Align git commit activity with sprint periods
 
 ### Interactive Dashboards
 - **Self-Sufficient HTML Dashboards**: Generate standalone HTML files with embedded data and styles
 - **Dual Dashboard Types**:
-  - **Basic Stats Dashboard**: Time-based activity with story points tracking
-  - **Simple Stats Dashboard**: Comprehensive developer statistics with issue codes
+  - **Sprint Analytics Dashboard**: Sprint-focused activity with story points tracking
+  - **KPI Dashboard**: Key performance indicators and team metrics
 - **Responsive Design**: Modern, mobile-friendly interface using TailwindCSS
 - **Real-time Data**: Embedded JSON data for instant loading without external dependencies
 
@@ -78,8 +78,7 @@ Set the following environment variables for configuration:
 #### Optional Variables (with defaults)
 - `DB_NAME`: Name of the SQLite database file (default: `data/sdm_tools.db`)
 - `TABLE_NAME`: Name of the table to store issues (default: `iotmi_3p_issues`)
-- `BASIC_STATS`: Path to the basic statistics JSON file (default: `ux/web/data/team_basic_stats.json`)
-- `SIMPLE_STATS`: Path to the simple statistics JSON file (default: `ux/web/data/team_simple_stats.json`)
+- `EXCLUDED_EMAILS`: Comma-separated list of email addresses to exclude from analytics (default: empty)
 
 #### Additional Variables
 - `REPO_NAME`: Name of the repository for reference (e.g., `your-repo-name`)
@@ -99,8 +98,7 @@ export DB_NAME='sdm_tools.db'
 export TABLE_NAME='iotmi_3p_issues'
 export REPO_PATH='/path/to/repo'
 export REPO_NAME='your-repo-name'
-export BASIC_STATS='ux/web/data/team_basic_stats.json'
-export SIMPLE_STATS='ux/web/data/team_simple_stats.json'
+export EXCLUDED_EMAILS='bot@example.com,automated@example.com'
 ```
 
 ## Usage
@@ -130,48 +128,43 @@ The CLI provides the following options:
    - Update commit data since the earliest Jira ticket date
    - Display commits with author information and pagination
 
-3. **Team basic stats JSON (update/display)**
-   - Generate time-based statistics (1, 3, 7 days)
-   - Include story points closed by time period
+3. **Team sprint analytics JSON (update/display)**
+   - Generate comprehensive sprint-based statistics
+   - Include story points, commits, and issue tracking per sprint
    - Extract and display issue codes from Jira data
-   - Save to `BASIC_STATS` file location
+   - Save to `ux/web/data/team_sprint_stats.json`
 
-4. **Team simple stats JSON (update/display)**
-   - Generate comprehensive developer statistics
-   - Include productivity scores and commit-to-issue ratios
-   - Calculate total story points and issue codes per developer
-   - Save to `SIMPLE_STATS` file location
-
-5. **Generate self-sufficient HTML dashboards**
-   - **NEW FEATURE**: Automatically process all HTML files in `ux/web/` directory
+4. **Generate self-sufficient HTML dashboard**
+   - Automatically process all HTML files in `ux/web/` directory
    - Generate standalone HTML files in the `dist/` directory
    - Embed CSS styles and JSON data for offline viewing
    - Create timestamped backups of existing files
-   - Support both basic and simple dashboard types
+   - Support sprint analytics and KPI dashboard types
 
-6. **Exit**
+5. **Exit**
 
 ### Dashboard Features
 
-#### Basic Stats Dashboard
-- **Time-based Activity Tracking**: Shows commits, Jira updates, and story points for 1, 3, and 7-day periods
+#### Sprint Analytics Dashboard
+- **Sprint-based Tracking**: Shows activity organized by sprint periods
+- **Story Points Integration**: Dedicated tracking of story points per sprint
 - **Interactive Table**: Sortable table with all developer metrics
-- **Individual Cards**: Detailed cards for each developer with activity breakdown
-- **Story Points Integration**: Dedicated columns and sections for story points closed
-- **Issue Codes Display**: Purple badges showing relevant issue codes
+- **Individual Cards**: Detailed cards for each developer with sprint breakdown
+- **Issue Codes Display**: Visual badges showing relevant issue codes
+- **Commit Activity**: Git commit tracking aligned with sprint periods
 
-#### Simple Stats Dashboard
-- **Comprehensive Statistics**: Total commits, issues, story points, and productivity scores
-- **Top Performers**: Ranked list of top-performing developers
-- **Issue Code Badges**: Visual display of issue codes worked on
-- **Productivity Metrics**: Commit-to-issue ratios and productivity scoring
+#### KPI Dashboard
+- **Key Performance Indicators**: Comprehensive team and individual KPIs
+- **Sprint Progress**: Visual representation of sprint completion rates
+- **Developer Performance**: Individual developer statistics and trends
+- **Issue Resolution**: Tracking of issue resolution rates and patterns
 - **Modern UI**: Responsive design with gradient backgrounds and hover effects
 
 ### Generated Files
 
-When using option 5, the tool generates:
-- `dist/team-basic-stats-dashboard.html`: Self-sufficient basic stats dashboard
-- `dist/team-simple-stats-dashboard.html`: Self-sufficient simple stats dashboard
+When using option 4, the tool generates:
+- `dist/team-sprint-stats.html`: Self-sufficient sprint analytics dashboard
+- `dist/team-sprint-kpi-dashboard.html`: Self-sufficient KPI dashboard
 - Timestamped backups of any existing files
 
 These files can be:
@@ -232,8 +225,8 @@ sdm-tools/
 4. **File Permissions**: Check that the tool has write access to create database and output files
 
 ### Dashboard Generation
-- If dashboards don't generate, ensure JSON data files exist (run options 3 and 4 first)
+- If dashboards don't generate, ensure JSON data files exist (run option 3 first)
 - Check that the `ux/web/` directory contains the HTML template files
 - Verify the `dist/` directory is writable
 
-For additional support or feature requests, please refer to the project documentation or contact the development team.
+Feedback is welcome juan.gramajo@telus.com
