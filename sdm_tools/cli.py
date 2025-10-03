@@ -6,7 +6,8 @@ from .utils import clear_screen, print_banner, console
 from .jira import fetch_issue_ids, fetch_issue_details
 from .database import (
     store_issues_in_db, display_issues, update_git_commits, display_commits,
-    generate_sprint_stats_json, display_existing_sprint_stats
+    generate_sprint_stats_json, display_existing_sprint_stats,
+    generate_developer_activity_json
 )
 from .config import DB_NAME, TABLE_NAME
 
@@ -191,6 +192,57 @@ def handle_sprint_analytics_option():
             input("Press Enter to return to the menu...")
 
 
+def handle_developer_activity_option():
+    """Handle the developer activity option (generate JSON with activity by sprint and last 3 days)."""
+    activity_file = "ux/web/data/developer_activity.json"
+
+    # Check if activity file already exists
+    if os.path.exists(activity_file):
+        # Data exists, ask if user wants to update or just display
+        update_choice = console.input(
+            "[bold yellow]Developer activity file already exists. Do you want to update it? (y/N): [/bold yellow]").strip().lower()
+
+        if update_choice == 'y' or update_choice == 'yes':
+            # User wants to update
+            console.print(
+                "[bold yellow]Generating updated developer activity from Jira issues, git commits, and sprint data...[/bold yellow]")
+            try:
+                json_filename = generate_developer_activity_json()
+                if not json_filename:
+                    console.print(
+                        "[bold red]Failed to generate developer activity.[/bold red]")
+                    input("Press Enter to return to the menu...")
+            except Exception as e:
+                console.print(
+                    f"[bold red]Error generating developer activity: {str(e)}[/bold red]")
+                import traceback
+                traceback.print_exc()
+                input("Press Enter to return to the menu...")
+        else:
+            # User wants to just display existing data - show summary
+            console.print(
+                f"[bold green]Developer activity file exists at: {activity_file}[/bold green]")
+            console.print(
+                "[bold yellow]Use option 4 to generate HTML dashboard from this data.[/bold yellow]")
+            input("Press Enter to return to the menu...")
+    else:
+        # No data exists, generate it
+        console.print(
+            "[bold yellow]No developer activity file found. Generating from Jira issues, git commits, and sprint data...[/bold yellow]")
+        try:
+            json_filename = generate_developer_activity_json()
+            if not json_filename:
+                console.print(
+                    "[bold red]Failed to generate developer activity.[/bold red]")
+                input("Press Enter to return to the menu...")
+        except Exception as e:
+            console.print(
+                f"[bold red]Error generating developer activity: {str(e)}[/bold red]")
+            import traceback
+            traceback.print_exc()
+            input("Press Enter to return to the menu...")
+
+
 def handle_html_generation_option():
     """Handle the HTML generation option - creates self-sufficient HTML dashboards for all HTML files in ux/web."""
     import json
@@ -350,11 +402,13 @@ def manage_issues():
         console.print(
             "[bold cyan]3. Team sprint analytics JSON (update/display)[/bold cyan]")
         console.print(
-            "[bold cyan]4. Generate self-sufficient HTML dashboard[/bold cyan]")
-        console.print("[bold cyan]5. Exit[/bold cyan]")
+            "[bold cyan]4. Developer activity JSON (update/display)[/bold cyan]")
+        console.print(
+            "[bold cyan]5. Generate self-sufficient HTML dashboard[/bold cyan]")
+        console.print("[bold cyan]6. Exit[/bold cyan]")
 
         choice = console.input(
-            "[bold green]Enter your choice (1/2/3/4/5): [/bold green]")
+            "[bold green]Enter your choice (1/2/3/4/5/6): [/bold green]")
 
         if choice == '1':
             handle_issues_option()
@@ -363,8 +417,10 @@ def manage_issues():
         elif choice == '3':
             handle_sprint_analytics_option()
         elif choice == '4':
-            handle_html_generation_option()
+            handle_developer_activity_option()
         elif choice == '5':
+            handle_html_generation_option()
+        elif choice == '6':
             console.print("[bold red]Exiting SDM Tools.[/bold red]")
             break
         else:
