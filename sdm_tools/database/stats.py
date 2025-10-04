@@ -1228,6 +1228,23 @@ def get_last_3_days_activity(cursor):
     cutoff_date = datetime.now() - timedelta(days=3)
     cutoff_str = cutoff_date.isoformat()
 
+    # Get valid team members (assignees from Jira, filtered by excluded emails)
+    cursor.execute(f"""
+        SELECT DISTINCT assignee
+        FROM {TABLE_NAME}
+        WHERE assignee IS NOT NULL AND assignee != '' AND assignee != 'null'
+    """)
+    assignees = [row[0] for row in cursor.fetchall()]
+
+    # Filter out excluded emails and build valid email set
+    valid_emails = set()
+    valid_assignees = {}
+    for assignee in assignees:
+        name, email = extract_developer_info(assignee)
+        if not should_exclude_email(email):
+            valid_emails.add(email.lower())
+            valid_assignees[email.lower()] = (name, email)
+
     # Dictionary to accumulate activity per developer
     developer_activity = defaultdict(lambda: {
         'email': '',
@@ -1252,7 +1269,8 @@ def get_last_3_days_activity(cursor):
     for (creator_json,) in cursor.fetchall():
         if creator_json:
             name, email = extract_developer_info(creator_json)
-            if not should_exclude_email(email):
+            # Only count if this person is a valid team member
+            if email.lower() in valid_emails:
                 developer_activity[email]['email'] = email
                 developer_activity[email]['name'] = name
                 developer_activity[email]['breakdown']['issues_created'] += 1
@@ -1266,7 +1284,8 @@ def get_last_3_days_activity(cursor):
     for (assignee_json,) in cursor.fetchall():
         if assignee_json:
             name, email = extract_developer_info(assignee_json)
-            if not should_exclude_email(email):
+            # Only count if this person is a valid team member
+            if email.lower() in valid_emails:
                 developer_activity[email]['email'] = email
                 developer_activity[email]['name'] = name
                 developer_activity[email]['breakdown']['issues_updated'] += 1
@@ -1280,7 +1299,8 @@ def get_last_3_days_activity(cursor):
     for (assignee_json,) in cursor.fetchall():
         if assignee_json:
             name, email = extract_developer_info(assignee_json)
-            if not should_exclude_email(email):
+            # Only count if this person is a valid team member
+            if email.lower() in valid_emails:
                 developer_activity[email]['email'] = email
                 developer_activity[email]['name'] = name
                 developer_activity[email]['breakdown']['status_changes'] += 1
@@ -1302,12 +1322,15 @@ def get_last_3_days_activity(cursor):
             commit_date = datetime.strptime(date_clean, '%a %b %d %H:%M:%S %Y')
 
             if commit_date >= cutoff_date:
-                # Match to Jira user by email
-                if author_email and not should_exclude_email(author_email):
-                    developer_activity[author_email]['email'] = author_email
-                    developer_activity[author_email]['name'] = author_name
-                    developer_activity[author_email]['breakdown']['commits'] += 1
-                    developer_activity[author_email]['repo_actions'] += 1
+                # Match to Jira user by email - only count if valid team member
+                if author_email and author_email.lower() in valid_emails:
+                    # Use the name from Jira assignee data for consistency
+                    jira_name, jira_email = valid_assignees[author_email.lower(
+                    )]
+                    developer_activity[jira_email]['email'] = jira_email
+                    developer_activity[jira_email]['name'] = jira_name
+                    developer_activity[jira_email]['breakdown']['commits'] += 1
+                    developer_activity[jira_email]['repo_actions'] += 1
         except:
             continue
 
@@ -1356,6 +1379,23 @@ def get_sprint_activity(cursor, sprint_id, sprint_name, start_date, end_date, sp
     except:
         return None
 
+    # Get valid team members (assignees from Jira, filtered by excluded emails)
+    cursor.execute(f"""
+        SELECT DISTINCT assignee
+        FROM {TABLE_NAME}
+        WHERE assignee IS NOT NULL AND assignee != '' AND assignee != 'null'
+    """)
+    assignees = [row[0] for row in cursor.fetchall()]
+
+    # Filter out excluded emails and build valid email set
+    valid_emails = set()
+    valid_assignees = {}
+    for assignee in assignees:
+        name, email = extract_developer_info(assignee)
+        if not should_exclude_email(email):
+            valid_emails.add(email.lower())
+            valid_assignees[email.lower()] = (name, email)
+
     # Dictionary to accumulate activity per developer
     developer_activity = defaultdict(lambda: {
         'email': '',
@@ -1381,7 +1421,8 @@ def get_sprint_activity(cursor, sprint_id, sprint_name, start_date, end_date, sp
     for creator_json, created in cursor.fetchall():
         if creator_json:
             name, email = extract_developer_info(creator_json)
-            if not should_exclude_email(email):
+            # Only count if this person is a valid team member
+            if email.lower() in valid_emails:
                 developer_activity[email]['email'] = email
                 developer_activity[email]['name'] = name
                 developer_activity[email]['breakdown']['issues_created'] += 1
@@ -1395,7 +1436,8 @@ def get_sprint_activity(cursor, sprint_id, sprint_name, start_date, end_date, sp
     for assignee_json, sprints_json in cursor.fetchall():
         if assignee_json:
             name, email = extract_developer_info(assignee_json)
-            if not should_exclude_email(email):
+            # Only count if this person is a valid team member
+            if email.lower() in valid_emails:
                 developer_activity[email]['email'] = email
                 developer_activity[email]['name'] = name
                 developer_activity[email]['breakdown']['issues_assigned'] += 1
@@ -1409,7 +1451,8 @@ def get_sprint_activity(cursor, sprint_id, sprint_name, start_date, end_date, sp
     for assignee_json, updated in cursor.fetchall():
         if assignee_json:
             name, email = extract_developer_info(assignee_json)
-            if not should_exclude_email(email):
+            # Only count if this person is a valid team member
+            if email.lower() in valid_emails:
                 developer_activity[email]['email'] = email
                 developer_activity[email]['name'] = name
                 developer_activity[email]['breakdown']['issues_updated'] += 1
@@ -1424,7 +1467,8 @@ def get_sprint_activity(cursor, sprint_id, sprint_name, start_date, end_date, sp
     for assignee_json, status_date in cursor.fetchall():
         if assignee_json:
             name, email = extract_developer_info(assignee_json)
-            if not should_exclude_email(email):
+            # Only count if this person is a valid team member
+            if email.lower() in valid_emails:
                 developer_activity[email]['email'] = email
                 developer_activity[email]['name'] = name
                 developer_activity[email]['breakdown']['status_changes'] += 1
@@ -1449,11 +1493,15 @@ def get_sprint_activity(cursor, sprint_id, sprint_name, start_date, end_date, sp
             commit_date_only = commit_date.date()
 
             if sprint_start_date <= commit_date_only <= sprint_end_date:
-                if author_email and not should_exclude_email(author_email):
-                    developer_activity[author_email]['email'] = author_email
-                    developer_activity[author_email]['name'] = author_name
-                    developer_activity[author_email]['breakdown']['commits'] += 1
-                    developer_activity[author_email]['repo_actions'] += 1
+                # Match to Jira user by email - only count if valid team member
+                if author_email and author_email.lower() in valid_emails:
+                    # Use the name from Jira assignee data for consistency
+                    jira_name, jira_email = valid_assignees[author_email.lower(
+                    )]
+                    developer_activity[jira_email]['email'] = jira_email
+                    developer_activity[jira_email]['name'] = jira_name
+                    developer_activity[jira_email]['breakdown']['commits'] += 1
+                    developer_activity[jira_email]['repo_actions'] += 1
         except:
             continue
 
