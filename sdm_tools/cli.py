@@ -338,34 +338,43 @@ def handle_html_generation_option():
                 # Use more indentation for readability
                 json_str = json.dumps(json_data, indent=8)
 
-                # Find the useEffect block and replace the entire fetch logic
-                useEffect_start = html_content.find("useEffect(() => {")
-                if useEffect_start != -1:
-                    # Find the end of the useEffect block
-                    useEffect_end = html_content.find(
-                        "}, []);", useEffect_start)
-                    if useEffect_end != -1:
-                        useEffect_end += len("}, []);")
+                # Find the useEffect block that contains fetch logic
+                # Look for the pattern that includes fetch('./data/
+                fetch_pattern = "fetch('./data/"
+                fetch_start = html_content.find(fetch_pattern)
 
-                        # Determine the state setter function name based on the HTML content
-                        if "setData(" in html_content:
-                            state_setter = "setData"
-                        elif "setTeamData(" in html_content:
-                            state_setter = "setTeamData"
-                        else:
-                            state_setter = "setData"  # Default
+                if fetch_start != -1:
+                    # Find the useEffect that contains this fetch
+                    # Search backwards from fetch to find the start of useEffect
+                    useEffect_start = html_content.rfind(
+                        "useEffect(() => {", 0, fetch_start)
 
-                        # Create the new useEffect content with embedded data
-                        new_useEffect = f"""useEffect(() => {{
+                    if useEffect_start != -1:
+                        # Find the end of this useEffect block
+                        useEffect_end = html_content.find(
+                            "}, []);", useEffect_start)
+                        if useEffect_end != -1:
+                            useEffect_end += len("}, []);")
+
+                            # Determine the state setter function name based on the HTML content
+                            if "setData(" in html_content:
+                                state_setter = "setData"
+                            elif "setTeamData(" in html_content:
+                                state_setter = "setTeamData"
+                            else:
+                                state_setter = "setData"  # Default
+
+                            # Create the new useEffect content with embedded data
+                            new_useEffect = f"""useEffect(() => {{
             // Data embedded directly in the HTML
             {state_setter}({json_str});
             setLoading(false);
         }}, []);"""
 
-                        # Replace the entire useEffect block
-                        html_content = (html_content[:useEffect_start] +
-                                        new_useEffect +
-                                        html_content[useEffect_end:])
+                            # Replace the entire useEffect block
+                            html_content = (html_content[:useEffect_start] +
+                                            new_useEffect +
+                                            html_content[useEffect_end:])
 
                 # Write the combined HTML file
                 with open(target_file, 'w', encoding='utf-8') as f:
