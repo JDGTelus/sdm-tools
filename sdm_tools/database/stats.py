@@ -1350,7 +1350,8 @@ def get_last_3_days_activity(cursor):
         'total_jira_actions': sum(d['jira_actions'] for d in developers),
         'total_repo_actions': sum(d['repo_actions'] for d in developers),
         'total_activity': sum(d['total_activity'] for d in developers),
-        'most_active_developer': developers[0]['email'] if developers else None
+        'active_developers': len(developers),
+        'most_active_developer': developers[0]['name'] if developers else 'None'
     }
 
     return {
@@ -1577,16 +1578,25 @@ def calculate_developer_summary(cursor, sprint_activity_list):
     developer_summary = []
     for email, data in developer_totals.items():
         if data['email']:
-            data['avg_activity_per_sprint'] = round(
+            # Calculate average activity per sprint
+            avg_activity = round(
                 data['total_activity_all_sprints'] /
                 data['sprints_participated'], 2
             ) if data['sprints_participated'] > 0 else 0
+
+            # Add fields that match what the HTML dashboard expects
+            data['avg_activity_per_sprint'] = avg_activity
             data['last_3_days_activity'] = last_3_days_map.get(email, 0)
+            # Add aliases for consistency with sprint_activity format
+            data['total_activity'] = data['total_activity_all_sprints']
+            data['jira_actions'] = data['total_jira_actions']
+            data['repo_actions'] = data['total_repo_actions']
+
             developer_summary.append(data)
 
     # Sort by total_activity (desc), then repo_actions (desc)
     developer_summary.sort(key=lambda x: (
-        x['total_activity_all_sprints'], x['total_repo_actions']), reverse=True)
+        x['total_activity'], x['repo_actions']), reverse=True)
 
     return developer_summary
 

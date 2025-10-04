@@ -292,7 +292,9 @@ def handle_html_generation_option():
 
                 # Determine which JSON file to use based on HTML filename
                 json_file = None
-                if "sprint" in filename.lower():
+                if "activity" in filename.lower():
+                    json_file = "ux/web/data/developer_activity.json"
+                elif "sprint" in filename.lower():
                     json_file = "ux/web/data/team_sprint_stats.json"
                 elif "basic" in filename.lower():
                     json_file = "ux/web/data/team_basic_stats.json"
@@ -345,10 +347,18 @@ def handle_html_generation_option():
                     if useEffect_end != -1:
                         useEffect_end += len("}, []);")
 
+                        # Determine the state setter function name based on the HTML content
+                        if "setData(" in html_content:
+                            state_setter = "setData"
+                        elif "setTeamData(" in html_content:
+                            state_setter = "setTeamData"
+                        else:
+                            state_setter = "setData"  # Default
+
                         # Create the new useEffect content with embedded data
                         new_useEffect = f"""useEffect(() => {{
             // Data embedded directly in the HTML
-            setTeamData({json_str});
+            {state_setter}({json_str});
             setLoading(false);
         }}, []);"""
 
