@@ -339,9 +339,14 @@ def handle_html_generation_option():
                 json_str = json.dumps(json_data, indent=8)
 
                 # Find the useEffect block that contains fetch logic
-                # Look for the pattern that includes fetch('./data/
-                fetch_pattern = "fetch('./data/"
-                fetch_start = html_content.find(fetch_pattern)
+                # Look for the pattern that includes fetch('./data/ or fetch('data/
+                fetch_pattern_1 = "fetch('./data/"
+                fetch_pattern_2 = "fetch('data/"
+                fetch_start = html_content.find(fetch_pattern_1)
+
+                # If first pattern not found, try the second pattern
+                if fetch_start == -1:
+                    fetch_start = html_content.find(fetch_pattern_2)
 
                 if fetch_start != -1:
                     # Find the useEffect that contains this fetch
