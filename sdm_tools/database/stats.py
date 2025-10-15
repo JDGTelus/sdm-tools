@@ -1,4 +1,5 @@
 """Statistics generation functionality."""
+
 import os
 import sqlite3
 import json
@@ -20,20 +21,21 @@ def extract_issue_code_from_watches(watches_data):
     try:
         # Parse the JSON string (it's stored as a string representation of a Python dict)
         import ast
+
         watches_dict = ast.literal_eval(watches_data)
 
         # Extract the 'self' URL
-        if 'self' in watches_dict:
-            url = watches_dict['self']
+        if "self" in watches_dict:
+            url = watches_dict["self"]
             # Split by '/' and get the part before '/watchers'
-            parts = url.split('/')
+            parts = url.split("/")
             if len(parts) >= 2:
                 # Look for the issue code in the URL path
                 for part in parts:
-                    if part.startswith('SET-') and len(part) > 4:
+                    if part.startswith("SET-") and len(part) > 4:
                         # Validate it looks like SET-XXXXX format (SET- followed by digits)
                         # Get part after 'SET-'
-                        issue_part = part.split('-', 1)[1]
+                        issue_part = part.split("-", 1)[1]
                         if issue_part.isdigit():
                             return part
     except (ValueError, AttributeError, TypeError, SyntaxError) as e:
@@ -46,14 +48,16 @@ def extract_issue_code_from_watches(watches_data):
 def backup_existing_stats_file():
     """Backup existing basic stats file if it exists."""
     if os.path.exists(BASIC_STATS):
-        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         # Ensure backup is created in the same directory as the stats file
         stats_dir = os.path.dirname(BASIC_STATS)
         backup_filename = os.path.join(
-            stats_dir, f"team_basic_stats_backup_{timestamp}.json")
+            stats_dir, f"team_basic_stats_backup_{timestamp}.json"
+        )
         shutil.copy2(BASIC_STATS, backup_filename)
         console.print(
-            f"[bold yellow]Existing basic stats file backed up to: {backup_filename}[/bold yellow]")
+            f"[bold yellow]Existing basic stats file backed up to: {backup_filename}[/bold yellow]"
+        )
         return backup_filename
     return None
 
@@ -63,14 +67,16 @@ def backup_existing_developer_stats_file():
     from ..config import SIMPLE_STATS
 
     if os.path.exists(SIMPLE_STATS):
-        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         # Ensure backup is created in the same directory as the stats file
         stats_dir = os.path.dirname(SIMPLE_STATS)
         backup_filename = os.path.join(
-            stats_dir, f"team_simple_stats_backup_{timestamp}.json")
+            stats_dir, f"team_simple_stats_backup_{timestamp}.json"
+        )
         shutil.copy2(SIMPLE_STATS, backup_filename)
         console.print(
-            f"[bold yellow]Existing developer stats file backed up to: {backup_filename}[/bold yellow]")
+            f"[bold yellow]Existing developer stats file backed up to: {backup_filename}[/bold yellow]"
+        )
         return backup_filename
     return None
 
@@ -79,17 +85,18 @@ def extract_developer_info(assignee_json_str):
     """Extract name and email from the assignee JSON string."""
     try:
         import ast
+
         assignee_dict = ast.literal_eval(assignee_json_str)
-        name = assignee_dict.get('displayName', 'Unknown')
-        email = assignee_dict.get('emailAddress', 'Unknown')
+        name = assignee_dict.get("displayName", "Unknown")
+        email = assignee_dict.get("emailAddress", "Unknown")
         return name, email
     except:
-        return assignee_json_str, 'Unknown'
+        return assignee_json_str, "Unknown"
 
 
 def should_exclude_email(email):
     """Check if an email should be excluded from the output."""
-    if not email or email == 'Unknown':
+    if not email or email == "Unknown":
         return False
 
     # Clean up the excluded emails list (remove empty strings and whitespace)
@@ -104,17 +111,19 @@ def get_jira_stats_for_assignee(cursor, assignee):
     stats = {}
 
     # Total issues assigned
-    cursor.execute(
-        f"SELECT COUNT(*) FROM {TABLE_NAME} WHERE assignee = ?", (assignee,))
+    cursor.execute(f"SELECT COUNT(*) FROM {TABLE_NAME} WHERE assignee = ?", (assignee,))
     stats["total_issues"] = cursor.fetchone()[0]
 
     # Issues by status
-    cursor.execute(f"""
+    cursor.execute(
+        f"""
         SELECT status, COUNT(*)
         FROM {TABLE_NAME}
         WHERE assignee = ?
         GROUP BY status
-    """, (assignee,))
+    """,
+        (assignee,),
+    )
     status_counts = dict(cursor.fetchall())
     stats["issues_by_status"] = status_counts
 
@@ -123,57 +132,73 @@ def get_jira_stats_for_assignee(cursor, assignee):
     columns = [info[1] for info in cursor.fetchall()]
 
     # Issues by priority (if priority field exists)
-    if 'priority' in columns:
-        cursor.execute(f"""
+    if "priority" in columns:
+        cursor.execute(
+            f"""
             SELECT priority, COUNT(*)
             FROM {TABLE_NAME}
             WHERE assignee = ? AND priority IS NOT NULL AND priority != ''
             GROUP BY priority
-        """, (assignee,))
+        """,
+            (assignee,),
+        )
         priority_counts = dict(cursor.fetchall())
         stats["issues_by_priority"] = priority_counts
 
     # Total story points (if customfield_10026 exists)
-    if 'customfield_10026' in columns:
-        cursor.execute(f"""
+    if "customfield_10026" in columns:
+        cursor.execute(
+            f"""
             SELECT SUM(CAST(customfield_10026 AS REAL))
             FROM {TABLE_NAME}
             WHERE assignee = ? AND customfield_10026 IS NOT NULL AND customfield_10026 != ''
-        """, (assignee,))
+        """,
+            (assignee,),
+        )
         result = cursor.fetchone()[0]
         stats["total_story_points"] = round(result, 1) if result else 0
 
     # Story points by status (if customfield_10026 exists)
-    if 'customfield_10026' in columns:
-        cursor.execute(f"""
+    if "customfield_10026" in columns:
+        cursor.execute(
+            f"""
             SELECT status, SUM(CAST(customfield_10026 AS REAL))
             FROM {TABLE_NAME}
             WHERE assignee = ? AND customfield_10026 IS NOT NULL AND customfield_10026 != ''
             GROUP BY status
-        """, (assignee,))
+        """,
+            (assignee,),
+        )
         story_points_by_status = dict(cursor.fetchall())
         # Round the values
         stats["story_points_by_status"] = {
-            k: round(v, 1) if v else 0 for k, v in story_points_by_status.items()}
+            k: round(v, 1) if v else 0 for k, v in story_points_by_status.items()
+        }
 
     # Issues by label (if customfield_10014 exists)
-    if 'customfield_10014' in columns:
-        cursor.execute(f"""
+    if "customfield_10014" in columns:
+        cursor.execute(
+            f"""
             SELECT customfield_10014, COUNT(*)
             FROM {TABLE_NAME}
             WHERE assignee = ? AND customfield_10014 IS NOT NULL AND customfield_10014 != ''
             GROUP BY customfield_10014
-        """, (assignee,))
+        """,
+            (assignee,),
+        )
         label_counts = dict(cursor.fetchall())
         stats["issues_by_label"] = label_counts
 
     # Extract issue codes from watches field (if watches field exists)
-    if 'watches' in columns:
-        cursor.execute(f"""
+    if "watches" in columns:
+        cursor.execute(
+            f"""
             SELECT watches
             FROM {TABLE_NAME}
             WHERE assignee = ? AND watches IS NOT NULL AND watches != ''
-        """, (assignee,))
+        """,
+            (assignee,),
+        )
         watches_data = cursor.fetchall()
 
         issue_codes = []
@@ -185,22 +210,23 @@ def get_jira_stats_for_assignee(cursor, assignee):
         stats["issue_codes"] = issue_codes
 
     # Average time in status (if created and updated fields exist)
-    if 'created' in columns and 'updated' in columns:
-        cursor.execute(f"""
+    if "created" in columns and "updated" in columns:
+        cursor.execute(
+            f"""
             SELECT created, updated
             FROM {TABLE_NAME}
             WHERE assignee = ? AND created IS NOT NULL AND updated IS NOT NULL
-        """, (assignee,))
+        """,
+            (assignee,),
+        )
         dates = cursor.fetchall()
         if dates:
             total_days = 0
             valid_dates = 0
             for created, updated in dates:
                 try:
-                    created_date = datetime.strptime(
-                        created, "%Y-%m-%dT%H:%M:%S.%f%z")
-                    updated_date = datetime.strptime(
-                        updated, "%Y-%m-%dT%H:%M:%S.%f%z")
+                    created_date = datetime.strptime(created, "%Y-%m-%dT%H:%M:%S.%f%z")
+                    updated_date = datetime.strptime(updated, "%Y-%m-%dT%H:%M:%S.%f%z")
                     days_diff = (updated_date - created_date).days
                     if days_diff >= 0:
                         total_days += days_diff
@@ -209,8 +235,7 @@ def get_jira_stats_for_assignee(cursor, assignee):
                     continue
 
             if valid_dates > 0:
-                stats["avg_days_to_update"] = round(
-                    total_days / valid_dates, 2)
+                stats["avg_days_to_update"] = round(total_days / valid_dates, 2)
 
     return stats
 
@@ -222,11 +247,12 @@ def get_git_stats_for_assignee(cursor, assignee):
     # Extract email from assignee JSON if possible
     try:
         import ast
+
         assignee_dict = ast.literal_eval(assignee)
-        assignee_email = assignee_dict.get('emailAddress', '')
-        assignee_name = assignee_dict.get('displayName', '')
+        assignee_email = assignee_dict.get("emailAddress", "")
+        assignee_name = assignee_dict.get("displayName", "")
     except:
-        assignee_email = ''
+        assignee_email = ""
         assignee_name = assignee
 
     # Try to find commits by matching assignee email or name with author_email or author_name
@@ -240,48 +266,51 @@ def get_git_stats_for_assignee(cursor, assignee):
     matching_authors = []
 
     for pattern in search_patterns:
-        cursor.execute("""
+        cursor.execute(
+            """
             SELECT COUNT(*), author_name, author_email
             FROM git_commits
             WHERE author_name LIKE ? OR author_email LIKE ?
             GROUP BY author_name, author_email
-        """, (f"%{pattern}%", f"%{pattern}%"))
+        """,
+            (f"%{pattern}%", f"%{pattern}%"),
+        )
 
         matches = cursor.fetchall()
         for count, name, email in matches:
             # Avoid duplicates
-            if not any(author['email'] == email for author in matching_authors):
+            if not any(author["email"] == email for author in matching_authors):
                 total_commits += count
-                matching_authors.append({
-                    "name": name,
-                    "email": email,
-                    "commits": count
-                })
+                matching_authors.append(
+                    {"name": name, "email": email, "commits": count}
+                )
 
     stats["total_commits"] = total_commits
     stats["matching_git_authors"] = matching_authors
 
     # Get commit frequency (commits per day) for all matching authors
     if matching_authors:
-        all_emails = [author['email'] for author in matching_authors]
-        placeholders = ','.join(['?' for _ in all_emails])
-        cursor.execute(f"""
+        all_emails = [author["email"] for author in matching_authors]
+        placeholders = ",".join(["?" for _ in all_emails])
+        cursor.execute(
+            f"""
             SELECT date
             FROM git_commits
             WHERE author_email IN ({placeholders})
             ORDER BY date
-        """, all_emails)
+        """,
+            all_emails,
+        )
 
         commit_dates = [row[0] for row in cursor.fetchall()]
         if len(commit_dates) > 1:
             try:
-                first_commit = datetime.strptime(
-                    commit_dates[0].split()[0], "%Y-%m-%d")
-                last_commit = datetime.strptime(
-                    commit_dates[-1].split()[0], "%Y-%m-%d")
+                first_commit = datetime.strptime(commit_dates[0].split()[0], "%Y-%m-%d")
+                last_commit = datetime.strptime(commit_dates[-1].split()[0], "%Y-%m-%d")
                 days_active = (last_commit - first_commit).days + 1
-                stats["commits_per_day"] = round(
-                    total_commits / days_active, 2) if days_active > 0 else 0
+                stats["commits_per_day"] = (
+                    round(total_commits / days_active, 2) if days_active > 0 else 0
+                )
                 stats["days_active"] = days_active
             except:
                 pass
@@ -316,8 +345,7 @@ def calculate_combined_stats(jira_stats, git_stats):
     done_count = sum(status_counts.get(status, 0) for status in done_statuses)
 
     if total_jira_issues > 0:
-        combined["completion_rate"] = round(
-            (done_count / total_jira_issues) * 100, 2)
+        combined["completion_rate"] = round((done_count / total_jira_issues) * 100, 2)
     else:
         combined["completion_rate"] = 0
 
@@ -328,38 +356,50 @@ def generate_summary_stats(developer_stats):
     """Generate summary statistics across all developers."""
     summary = {
         "total_developers": len(developer_stats),
-        "total_issues": sum(dev["jira_stats"].get("total_issues", 0) for dev in developer_stats.values()),
-        "total_commits": sum(dev["git_stats"].get("total_commits", 0) for dev in developer_stats.values()),
+        "total_issues": sum(
+            dev["jira_stats"].get("total_issues", 0) for dev in developer_stats.values()
+        ),
+        "total_commits": sum(
+            dev["git_stats"].get("total_commits", 0) for dev in developer_stats.values()
+        ),
         "avg_productivity_score": 0,
         "avg_completion_rate": 0,
-        "top_performers": []
+        "top_performers": [],
     }
 
     if developer_stats:
         # Calculate averages
-        productivity_scores = [dev["combined_stats"].get(
-            "productivity_score", 0) for dev in developer_stats.values()]
-        completion_rates = [dev["combined_stats"].get(
-            "completion_rate", 0) for dev in developer_stats.values()]
+        productivity_scores = [
+            dev["combined_stats"].get("productivity_score", 0)
+            for dev in developer_stats.values()
+        ]
+        completion_rates = [
+            dev["combined_stats"].get("completion_rate", 0)
+            for dev in developer_stats.values()
+        ]
 
         summary["avg_productivity_score"] = round(
-            sum(productivity_scores) / len(productivity_scores), 2)
+            sum(productivity_scores) / len(productivity_scores), 2
+        )
         summary["avg_completion_rate"] = round(
-            sum(completion_rates) / len(completion_rates), 2)
+            sum(completion_rates) / len(completion_rates), 2
+        )
 
         # Top performers by productivity score
         sorted_devs = sorted(
             developer_stats.items(),
             key=lambda x: x[1]["combined_stats"].get("productivity_score", 0),
-            reverse=True
+            reverse=True,
         )
 
         summary["top_performers"] = [
             {
                 "name": name,
-                "productivity_score": stats["combined_stats"].get("productivity_score", 0),
+                "productivity_score": stats["combined_stats"].get(
+                    "productivity_score", 0
+                ),
                 "total_issues": stats["jira_stats"].get("total_issues", 0),
-                "total_commits": stats["git_stats"].get("total_commits", 0)
+                "total_commits": stats["git_stats"].get("total_commits", 0),
             }
             for name, stats in sorted_devs[:5]  # Top 5
         ]
@@ -393,7 +433,7 @@ def display_developer_stats_summary(developer_stats):
             str(git_stats.get("total_commits", 0)),
             str(combined_stats.get("productivity_score", 0)),
             f"{combined_stats.get('completion_rate', 0)}%",
-            str(combined_stats.get("commits_per_issue", 0))
+            str(combined_stats.get("commits_per_issue", 0)),
         )
 
     console.print("\n[bold yellow]Developer Statistics Summary:[/bold yellow]")
@@ -405,20 +445,17 @@ def get_time_based_commit_stats(cursor, assignee):
     from datetime import datetime, timedelta
     import re
 
-    stats = {
-        "last_1_day": 0,
-        "last_3_days": 0,
-        "last_7_days": 0
-    }
+    stats = {"last_1_day": 0, "last_3_days": 0, "last_7_days": 0}
 
     # Extract email from assignee JSON if possible
     try:
         import ast
+
         assignee_dict = ast.literal_eval(assignee)
-        assignee_email = assignee_dict.get('emailAddress', '')
-        assignee_name = assignee_dict.get('displayName', '')
+        assignee_email = assignee_dict.get("emailAddress", "")
+        assignee_name = assignee_dict.get("displayName", "")
     except:
-        assignee_email = ''
+        assignee_email = ""
         assignee_name = assignee
 
     # Calculate date thresholds
@@ -444,11 +481,14 @@ def get_time_based_commit_stats(cursor, assignee):
     # Use OR to combine conditions, but avoid double counting
     where_clause = " OR ".join(search_conditions)
 
-    cursor.execute(f"""
+    cursor.execute(
+        f"""
         SELECT DISTINCT date
         FROM git_commits
         WHERE {where_clause}
-    """, search_params)
+    """,
+        search_params,
+    )
 
     commit_dates = cursor.fetchall()
 
@@ -456,8 +496,8 @@ def get_time_based_commit_stats(cursor, assignee):
         try:
             # Parse git date format: "Wed Sep 17 23:37:12 2025 +0000"
             # Remove timezone info and parse
-            date_clean = re.sub(r'\s+[+-]\d{4}$', '', date_str)
-            commit_date = datetime.strptime(date_clean, '%a %b %d %H:%M:%S %Y')
+            date_clean = re.sub(r"\s+[+-]\d{4}$", "", date_str)
+            commit_date = datetime.strptime(date_clean, "%a %b %d %H:%M:%S %Y")
 
             # Count commits for each time period
             if commit_date >= one_day_ago:
@@ -470,7 +510,8 @@ def get_time_based_commit_stats(cursor, assignee):
         except (ValueError, AttributeError) as e:
             # Skip commits with unparseable dates
             console.print(
-                f"[bold yellow]Warning: Could not parse date '{date_str}': {e}[/bold yellow]")
+                f"[bold yellow]Warning: Could not parse date '{date_str}': {e}[/bold yellow]"
+            )
             continue
 
     return stats
@@ -480,11 +521,7 @@ def get_time_based_jira_stats(cursor, assignee):
     """Get Jira update statistics for specific time periods."""
     from datetime import datetime, timedelta
 
-    stats = {
-        "last_1_day": 0,
-        "last_3_days": 0,
-        "last_7_days": 0
-    }
+    stats = {"last_1_day": 0, "last_3_days": 0, "last_7_days": 0}
 
     # Calculate date thresholds
     now = datetime.now()
@@ -496,29 +533,38 @@ def get_time_based_jira_stats(cursor, assignee):
     cursor.execute(f"PRAGMA table_info({TABLE_NAME})")
     columns = [info[1] for info in cursor.fetchall()]
 
-    if 'updated' in columns:
+    if "updated" in columns:
         # Last 1 day
-        cursor.execute(f"""
+        cursor.execute(
+            f"""
             SELECT COUNT(*)
             FROM {TABLE_NAME}
             WHERE assignee = ? AND updated >= ?
-        """, (assignee, one_day_ago))
+        """,
+            (assignee, one_day_ago),
+        )
         stats["last_1_day"] = cursor.fetchone()[0]
 
         # Last 3 days
-        cursor.execute(f"""
+        cursor.execute(
+            f"""
             SELECT COUNT(*)
             FROM {TABLE_NAME}
             WHERE assignee = ? AND updated >= ?
-        """, (assignee, three_days_ago))
+        """,
+            (assignee, three_days_ago),
+        )
         stats["last_3_days"] = cursor.fetchone()[0]
 
         # Last 7 days
-        cursor.execute(f"""
+        cursor.execute(
+            f"""
             SELECT COUNT(*)
             FROM {TABLE_NAME}
             WHERE assignee = ? AND updated >= ?
-        """, (assignee, seven_days_ago))
+        """,
+            (assignee, seven_days_ago),
+        )
         stats["last_7_days"] = cursor.fetchone()[0]
 
     return stats
@@ -528,17 +574,17 @@ def get_time_based_story_points_stats(cursor, assignee):
     """Get story points statistics for closed stories in specific time periods."""
     from datetime import datetime, timedelta
 
-    stats = {
-        "last_1_day": 0,
-        "last_3_days": 0,
-        "last_7_days": 0
-    }
+    stats = {"last_1_day": 0, "last_3_days": 0, "last_7_days": 0}
 
     # Check if required columns exist
     cursor.execute(f"PRAGMA table_info({TABLE_NAME})")
     columns = [info[1] for info in cursor.fetchall()]
 
-    if 'customfield_10026' not in columns or 'updated' not in columns or 'status' not in columns:
+    if (
+        "customfield_10026" not in columns
+        or "updated" not in columns
+        or "status" not in columns
+    ):
         return stats
 
     # Calculate date thresholds
@@ -549,10 +595,11 @@ def get_time_based_story_points_stats(cursor, assignee):
 
     # Common "closed" status indicators
     closed_statuses = ["Done", "Closed", "Resolved", "Complete", "Completed"]
-    status_placeholders = ','.join(['?' for _ in closed_statuses])
+    status_placeholders = ",".join(["?" for _ in closed_statuses])
 
     # Last 1 day - sum of story points for closed stories
-    cursor.execute(f"""
+    cursor.execute(
+        f"""
         SELECT SUM(CAST(customfield_10026 AS REAL))
         FROM {TABLE_NAME}
         WHERE assignee = ?
@@ -560,12 +607,15 @@ def get_time_based_story_points_stats(cursor, assignee):
         AND status IN ({status_placeholders})
         AND customfield_10026 IS NOT NULL
         AND customfield_10026 != ''
-    """, (assignee, one_day_ago, *closed_statuses))
+    """,
+        (assignee, one_day_ago, *closed_statuses),
+    )
     result = cursor.fetchone()[0]
     stats["last_1_day"] = round(result, 1) if result else 0
 
     # Last 3 days
-    cursor.execute(f"""
+    cursor.execute(
+        f"""
         SELECT SUM(CAST(customfield_10026 AS REAL))
         FROM {TABLE_NAME}
         WHERE assignee = ?
@@ -573,12 +623,15 @@ def get_time_based_story_points_stats(cursor, assignee):
         AND status IN ({status_placeholders})
         AND customfield_10026 IS NOT NULL
         AND customfield_10026 != ''
-    """, (assignee, three_days_ago, *closed_statuses))
+    """,
+        (assignee, three_days_ago, *closed_statuses),
+    )
     result = cursor.fetchone()[0]
     stats["last_3_days"] = round(result, 1) if result else 0
 
     # Last 7 days
-    cursor.execute(f"""
+    cursor.execute(
+        f"""
         SELECT SUM(CAST(customfield_10026 AS REAL))
         FROM {TABLE_NAME}
         WHERE assignee = ?
@@ -586,7 +639,9 @@ def get_time_based_story_points_stats(cursor, assignee):
         AND status IN ({status_placeholders})
         AND customfield_10026 IS NOT NULL
         AND customfield_10026 != ''
-    """, (assignee, seven_days_ago, *closed_statuses))
+    """,
+        (assignee, seven_days_ago, *closed_statuses),
+    )
     result = cursor.fetchone()[0]
     stats["last_7_days"] = round(result, 1) if result else 0
 
@@ -598,11 +653,12 @@ def get_unified_commit_stats(cursor, assignee):
     # Extract email from assignee JSON if possible
     try:
         import ast
+
         assignee_dict = ast.literal_eval(assignee)
-        assignee_email = assignee_dict.get('emailAddress', '')
-        assignee_name = assignee_dict.get('displayName', '')
+        assignee_email = assignee_dict.get("emailAddress", "")
+        assignee_name = assignee_dict.get("displayName", "")
     except:
-        assignee_email = ''
+        assignee_email = ""
         assignee_name = assignee
 
     # Get all commits for this assignee
@@ -622,11 +678,14 @@ def get_unified_commit_stats(cursor, assignee):
     # Use OR to combine conditions, but avoid double counting
     where_clause = " OR ".join(search_conditions)
 
-    cursor.execute(f"""
+    cursor.execute(
+        f"""
         SELECT COUNT(DISTINCT hash)
         FROM git_commits
         WHERE {where_clause}
-    """, search_params)
+    """,
+        search_params,
+    )
 
     result = cursor.fetchone()
     return result[0] if result else 0
@@ -638,15 +697,18 @@ def get_unified_jira_stats(cursor, assignee):
     cursor.execute(f"PRAGMA table_info({TABLE_NAME})")
     columns = [info[1] for info in cursor.fetchall()]
 
-    if 'updated' not in columns:
+    if "updated" not in columns:
         return 0
 
     # Count all Jira updates for this assignee
-    cursor.execute(f"""
+    cursor.execute(
+        f"""
         SELECT COUNT(*)
         FROM {TABLE_NAME}
         WHERE assignee = ?
-    """, (assignee,))
+    """,
+        (assignee,),
+    )
 
     result = cursor.fetchone()
     return result[0] if result else 0
@@ -658,22 +720,25 @@ def get_unified_story_points_stats(cursor, assignee):
     cursor.execute(f"PRAGMA table_info({TABLE_NAME})")
     columns = [info[1] for info in cursor.fetchall()]
 
-    if 'customfield_10026' not in columns or 'status' not in columns:
+    if "customfield_10026" not in columns or "status" not in columns:
         return 0
 
     # Common "closed" status indicators
     closed_statuses = ["Done", "Closed", "Resolved", "Complete", "Completed"]
-    status_placeholders = ','.join(['?' for _ in closed_statuses])
+    status_placeholders = ",".join(["?" for _ in closed_statuses])
 
     # Sum of story points for closed stories
-    cursor.execute(f"""
+    cursor.execute(
+        f"""
         SELECT SUM(CAST(customfield_10026 AS REAL))
         FROM {TABLE_NAME}
         WHERE assignee = ?
         AND status IN ({status_placeholders})
         AND customfield_10026 IS NOT NULL
         AND customfield_10026 != ''
-    """, (assignee, *closed_statuses))
+    """,
+        (assignee, *closed_statuses),
+    )
 
     result = cursor.fetchone()[0]
     return round(result, 1) if result else 0
@@ -685,15 +750,18 @@ def get_issue_codes_for_assignee(cursor, assignee):
     cursor.execute(f"PRAGMA table_info({TABLE_NAME})")
     columns = [info[1] for info in cursor.fetchall()]
 
-    if 'watches' not in columns:
+    if "watches" not in columns:
         return []
 
     # Get watches data for this assignee
-    cursor.execute(f"""
+    cursor.execute(
+        f"""
         SELECT watches
         FROM {TABLE_NAME}
         WHERE assignee = ? AND watches IS NOT NULL AND watches != ''
-    """, (assignee,))
+    """,
+        (assignee,),
+    )
     watches_data = cursor.fetchall()
 
     issue_codes = []
@@ -723,11 +791,10 @@ def display_basic_stats_summary(developer_basic_stats):
             email,
             str(stats["total_commits"]),
             str(stats["total_jira_updates"]),
-            str(stats["total_story_points_closed"])
+            str(stats["total_story_points_closed"]),
         )
 
-    console.print(
-        "\n[bold yellow]Unified Developer Statistics Summary:[/bold yellow]")
+    console.print("\n[bold yellow]Unified Developer Statistics Summary:[/bold yellow]")
     console.print(table)
 
 
@@ -737,18 +804,20 @@ def display_existing_basic_stats():
 
     if not os.path.exists(BASIC_STATS):
         console.print(
-            f"[bold red]No basic statistics file found: {BASIC_STATS}[/bold red]")
+            f"[bold red]No basic statistics file found: {BASIC_STATS}[/bold red]"
+        )
         input("Press Enter to return to the menu...")
         return
 
     try:
-        with open(BASIC_STATS, 'r') as f:
+        with open(BASIC_STATS, "r") as f:
             stats_data = json.load(f)
 
         developer_stats = stats_data.get("developers", {})
         if not developer_stats:
             console.print(
-                "[bold red]No developer statistics found in the file.[/bold red]")
+                "[bold red]No developer statistics found in the file.[/bold red]"
+            )
             input("Press Enter to return to the menu...")
             return
 
@@ -758,15 +827,16 @@ def display_existing_basic_stats():
         # Show file info
         generated_at = stats_data.get("generated_at", "Unknown")
         console.print(
-            f"\n[bold green]Basic statistics loaded from: {BASIC_STATS}[/bold green]")
-        console.print(
-            f"[bold yellow]Generated at: {generated_at}[/bold yellow]")
+            f"\n[bold green]Basic statistics loaded from: {BASIC_STATS}[/bold green]"
+        )
+        console.print(f"[bold yellow]Generated at: {generated_at}[/bold yellow]")
 
         input("\nPress Enter to return to the menu...")
 
     except Exception as e:
         console.print(
-            f"[bold red]Error reading basic statistics file: {str(e)}[/bold red]")
+            f"[bold red]Error reading basic statistics file: {str(e)}[/bold red]"
+        )
         input("Press Enter to return to the menu...")
 
 
@@ -776,7 +846,8 @@ def generate_sprint_stats_json():
 
     if not os.path.exists(DB_NAME):
         console.print(
-            "[bold red]Database does not exist. Please update issues and commits first.[/bold red]")
+            "[bold red]Database does not exist. Please update issues and commits first.[/bold red]"
+        )
         input("Press Enter to return to the menu...")
         return None
 
@@ -784,33 +855,37 @@ def generate_sprint_stats_json():
         cursor = conn.cursor()
 
         # Check if all required tables exist
-        required_tables = [TABLE_NAME, 'git_commits', f'{TABLE_NAME}_sprints']
+        required_tables = [TABLE_NAME, "git_commits", f"{TABLE_NAME}_sprints"]
         for table in required_tables:
             cursor.execute(
-                f"SELECT name FROM sqlite_master WHERE type='table' AND name='{table}'")
+                f"SELECT name FROM sqlite_master WHERE type='table' AND name='{table}'"
+            )
             if not cursor.fetchone():
                 console.print(
-                    f"[bold red]Required table '{table}' not found. Please ensure all data is loaded.[/bold red]")
+                    f"[bold red]Required table '{table}' not found. Please ensure all data is loaded.[/bold red]"
+                )
                 input("Press Enter to return to the menu...")
                 return None
 
         # Get all sprints
         cursor.execute(
-            f"SELECT id, name, state, startDate, endDate FROM {TABLE_NAME}_sprints ORDER BY startDate")
+            f"SELECT id, name, state, startDate, endDate FROM {TABLE_NAME}_sprints ORDER BY startDate"
+        )
         sprints = cursor.fetchall()
 
         if not sprints:
-            console.print(
-                "[bold red]No sprints found in the database.[/bold red]")
+            console.print("[bold red]No sprints found in the database.[/bold red]")
             input("Press Enter to return to the menu...")
             return None
 
         # Get all assignees from Jira issues (excluding empty/null assignees)
-        cursor.execute(f"""
+        cursor.execute(
+            f"""
             SELECT DISTINCT assignee
             FROM {TABLE_NAME}
             WHERE assignee IS NOT NULL AND assignee != '' AND assignee != 'null'
-        """)
+        """
+        )
         assignees = [row[0] for row in cursor.fetchall()]
 
         # Filter out excluded emails
@@ -822,7 +897,8 @@ def generate_sprint_stats_json():
 
         if not filtered_assignees:
             console.print(
-                "[bold red]No assignees found after filtering excluded emails.[/bold red]")
+                "[bold red]No assignees found after filtering excluded emails.[/bold red]"
+            )
             input("Press Enter to return to the menu...")
             return None
 
@@ -837,9 +913,9 @@ def generate_sprint_stats_json():
                     "name": sprint_name,
                     "state": sprint_state,
                     "start_date": start_date,
-                    "end_date": end_date
+                    "end_date": end_date,
                 },
-                "developers": {}
+                "developers": {},
             }
 
             # Get stats for each developer in this sprint
@@ -848,50 +924,62 @@ def generate_sprint_stats_json():
 
                 # Get sprint-specific stats for this developer
                 sprint_stats = get_sprint_stats_for_developer(
-                    cursor, assignee, sprint_id, start_date, end_date)
+                    cursor, assignee, sprint_id, start_date, end_date
+                )
 
                 # Only include developers who have activity in this sprint
-                if (sprint_stats["commits_in_sprint"] > 0 or
-                    sprint_stats["issues_assigned_in_sprint"] > 0 or
-                        sprint_stats["issues_closed_in_sprint"] > 0):
+                if (
+                    sprint_stats["commits_in_sprint"] > 0
+                    or sprint_stats["issues_assigned_in_sprint"] > 0
+                    or sprint_stats["issues_closed_in_sprint"] > 0
+                ):
 
                     sprint_analytics[sprint_key]["developers"][name] = {
                         "name": name,
                         "email": email,
                         "commits_in_sprint": sprint_stats["commits_in_sprint"],
-                        "issues_assigned_in_sprint": sprint_stats["issues_assigned_in_sprint"],
-                        "issues_closed_in_sprint": sprint_stats["issues_closed_in_sprint"],
-                        "story_points_closed_in_sprint": sprint_stats["story_points_closed_in_sprint"]
+                        "issues_assigned_in_sprint": sprint_stats[
+                            "issues_assigned_in_sprint"
+                        ],
+                        "issues_closed_in_sprint": sprint_stats[
+                            "issues_closed_in_sprint"
+                        ],
+                        "story_points_closed_in_sprint": sprint_stats[
+                            "story_points_closed_in_sprint"
+                        ],
                     }
 
         # Create final JSON structure
         final_json = {
             "generated_at": datetime.now().isoformat(),
-            "sprint_analytics": sprint_analytics
+            "sprint_analytics": sprint_analytics,
         }
 
         # Backup existing file if it exists
         if os.path.exists(sprint_stats_file):
-            timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
             stats_dir = os.path.dirname(sprint_stats_file)
             backup_filename = os.path.join(
-                stats_dir, f"team_sprint_stats_backup_{timestamp}.json")
+                stats_dir, f"team_sprint_stats_backup_{timestamp}.json"
+            )
             shutil.copy2(sprint_stats_file, backup_filename)
             console.print(
-                f"[bold yellow]Existing sprint stats file backed up to: {backup_filename}[/bold yellow]")
+                f"[bold yellow]Existing sprint stats file backed up to: {backup_filename}[/bold yellow]"
+            )
 
         # Ensure directory exists
         os.makedirs(os.path.dirname(sprint_stats_file), exist_ok=True)
 
         # Write to sprint stats JSON file
-        with open(sprint_stats_file, 'w') as f:
+        with open(sprint_stats_file, "w") as f:
             json.dump(final_json, f, indent=2, default=str)
 
         # Display summary
         display_sprint_stats_summary(sprint_analytics)
 
         console.print(
-            f"\n[bold green]Sprint statistics file created: {sprint_stats_file}[/bold green]")
+            f"\n[bold green]Sprint statistics file created: {sprint_stats_file}[/bold green]"
+        )
 
         input("\nPress Enter to return to the menu...")
         return sprint_stats_file
@@ -906,43 +994,46 @@ def get_sprint_stats_for_developer(cursor, assignee, sprint_id, start_date, end_
         "commits_in_sprint": 0,
         "issues_assigned_in_sprint": 0,
         "issues_closed_in_sprint": 0,
-        "story_points_closed_in_sprint": 0
+        "story_points_closed_in_sprint": 0,
     }
 
     # Extract developer info - handle JSON string format
     try:
         import json
+
         assignee_dict = json.loads(assignee)
-        assignee_email = assignee_dict.get('emailAddress', '')
-        assignee_name = assignee_dict.get('displayName', '')
+        assignee_email = assignee_dict.get("emailAddress", "")
+        assignee_name = assignee_dict.get("displayName", "")
     except (json.JSONDecodeError, TypeError):
         # Fallback to ast.literal_eval for older format
         try:
             import ast
+
             assignee_dict = ast.literal_eval(assignee)
-            assignee_email = assignee_dict.get('emailAddress', '')
-            assignee_name = assignee_dict.get('displayName', '')
+            assignee_email = assignee_dict.get("emailAddress", "")
+            assignee_name = assignee_dict.get("displayName", "")
         except:
-            assignee_email = ''
+            assignee_email = ""
             assignee_name = assignee
 
     # Parse sprint dates - handle different timezone formats
     try:
         if start_date:
             # Handle both 'Z' and '+00:00' timezone formats
-            start_date_clean = start_date.replace('Z', '+00:00')
+            start_date_clean = start_date.replace("Z", "+00:00")
             sprint_start = datetime.fromisoformat(start_date_clean)
         else:
             sprint_start = None
 
         if end_date:
-            end_date_clean = end_date.replace('Z', '+00:00')
+            end_date_clean = end_date.replace("Z", "+00:00")
             sprint_end = datetime.fromisoformat(end_date_clean)
         else:
             sprint_end = None
     except Exception as e:
         console.print(
-            f"[bold yellow]Warning: Could not parse sprint dates for sprint {sprint_id}: {e}[/bold yellow]")
+            f"[bold yellow]Warning: Could not parse sprint dates for sprint {sprint_id}: {e}[/bold yellow]"
+        )
         sprint_start = None
         sprint_end = None
 
@@ -962,14 +1053,17 @@ def get_sprint_stats_for_developer(cursor, assignee, sprint_id, start_date, end_
 
         # Convert sprint dates to date-only format for comparison
         sprint_start_date = sprint_start.date()  # Convert to date object (YYYY-MM-DD)
-        sprint_end_date = sprint_end.date()      # Convert to date object (YYYY-MM-DD)
+        sprint_end_date = sprint_end.date()  # Convert to date object (YYYY-MM-DD)
 
         # Get all commits with dates for this developer
-        cursor.execute(f"""
+        cursor.execute(
+            f"""
             SELECT DISTINCT hash, date
             FROM git_commits
             WHERE ({where_clause}) AND date IS NOT NULL
-        """, search_params)
+        """,
+            search_params,
+        )
 
         commit_data = cursor.fetchall()
         commits_in_range = 0
@@ -978,23 +1072,24 @@ def get_sprint_stats_for_developer(cursor, assignee, sprint_id, start_date, end_
             try:
                 # Parse git date format: "Fri Sep 19 15:06:43 2025 -0600"
                 # Remove timezone info first
-                date_clean = re.sub(r'\s+[+-]\d{4}$', '', date_str.strip())
+                date_clean = re.sub(r"\s+[+-]\d{4}$", "", date_str.strip())
 
                 # Parse the git date format
                 commit_datetime = None
                 try:
                     # Git format: "Fri Sep 19 15:06:43 2025"
                     commit_datetime = datetime.strptime(
-                        date_clean, '%a %b %d %H:%M:%S %Y')
+                        date_clean, "%a %b %d %H:%M:%S %Y"
+                    )
                 except ValueError:
                     # Try alternative formats if needed
                     try:
                         commit_datetime = datetime.strptime(
-                            date_clean, '%Y-%m-%d %H:%M:%S')
+                            date_clean, "%Y-%m-%d %H:%M:%S"
+                        )
                     except ValueError:
                         try:
-                            commit_datetime = datetime.strptime(
-                                date_clean, '%Y-%m-%d')
+                            commit_datetime = datetime.strptime(date_clean, "%Y-%m-%d")
                         except ValueError:
                             continue
 
@@ -1013,11 +1108,14 @@ def get_sprint_stats_for_developer(cursor, assignee, sprint_id, start_date, end_
         stats["commits_in_sprint"] = commits_in_range
 
     # 2. Get issues assigned to developer that are in this sprint
-    cursor.execute(f"""
+    cursor.execute(
+        f"""
         SELECT COUNT(*)
         FROM {TABLE_NAME}
         WHERE assignee = ? AND customfield_10020 LIKE ?
-    """, (assignee, f'%{sprint_id}%'))
+    """,
+        (assignee, f"%{sprint_id}%"),
+    )
 
     stats["issues_assigned_in_sprint"] = cursor.fetchone()[0]
 
@@ -1029,13 +1127,16 @@ def get_sprint_stats_for_developer(cursor, assignee, sprint_id, start_date, end_
         sprint_end_str = sprint_end.isoformat()
 
         # Get all issues for this assignee in this sprint within date range
-        cursor.execute(f"""
+        cursor.execute(
+            f"""
             SELECT status, customfield_10026
             FROM {TABLE_NAME}
             WHERE assignee = ?
             AND customfield_10020 LIKE ?
             AND updated >= ? AND updated <= ?
-        """, (assignee, f'%{sprint_id}%', sprint_start_str, sprint_end_str))
+        """,
+            (assignee, f"%{sprint_id}%", sprint_start_str, sprint_end_str),
+        )
 
         issues_data = cursor.fetchall()
         closed_count = 0
@@ -1045,16 +1146,19 @@ def get_sprint_stats_for_developer(cursor, assignee, sprint_id, start_date, end_
             try:
                 # Parse status JSON to get actual status name
                 status_dict = json.loads(status_json)
-                status_name = status_dict.get('name', '')
+                status_name = status_dict.get("name", "")
 
                 if status_name in closed_statuses:
                     closed_count += 1
 
                     # Add story points if available
-                    if story_points_str and story_points_str.strip() and story_points_str != 'null':
+                    if (
+                        story_points_str
+                        and story_points_str.strip()
+                        and story_points_str != "null"
+                    ):
                         try:
-                            story_points_value = float(
-                                story_points_str.strip())
+                            story_points_value = float(story_points_str.strip())
                             total_story_points += story_points_value
                         except (ValueError, TypeError):
                             continue
@@ -1063,17 +1167,21 @@ def get_sprint_stats_for_developer(cursor, assignee, sprint_id, start_date, end_
                 # Try fallback parsing for status
                 try:
                     import ast
+
                     status_dict = ast.literal_eval(status_json)
-                    status_name = status_dict.get('name', '')
+                    status_name = status_dict.get("name", "")
 
                     if status_name in closed_statuses:
                         closed_count += 1
 
                         # Add story points if available
-                        if story_points_str and story_points_str.strip() and story_points_str != 'null':
+                        if (
+                            story_points_str
+                            and story_points_str.strip()
+                            and story_points_str != "null"
+                        ):
                             try:
-                                story_points_value = float(
-                                    story_points_str.strip())
+                                story_points_value = float(story_points_str.strip())
                                 total_story_points += story_points_value
                             except (ValueError, TypeError):
                                 continue
@@ -1084,12 +1192,15 @@ def get_sprint_stats_for_developer(cursor, assignee, sprint_id, start_date, end_
         stats["story_points_closed_in_sprint"] = round(total_story_points, 1)
     else:
         # If no date range, just check for closed issues in the sprint
-        cursor.execute(f"""
+        cursor.execute(
+            f"""
             SELECT status, customfield_10026
             FROM {TABLE_NAME}
             WHERE assignee = ?
             AND customfield_10020 LIKE ?
-        """, (assignee, f'%{sprint_id}%'))
+        """,
+            (assignee, f"%{sprint_id}%"),
+        )
 
         issues_data = cursor.fetchall()
         closed_count = 0
@@ -1099,16 +1210,19 @@ def get_sprint_stats_for_developer(cursor, assignee, sprint_id, start_date, end_
             try:
                 # Parse status JSON to get actual status name
                 status_dict = json.loads(status_json)
-                status_name = status_dict.get('name', '')
+                status_name = status_dict.get("name", "")
 
                 if status_name in closed_statuses:
                     closed_count += 1
 
                     # Add story points if available
-                    if story_points_str and story_points_str.strip() and story_points_str != 'null':
+                    if (
+                        story_points_str
+                        and story_points_str.strip()
+                        and story_points_str != "null"
+                    ):
                         try:
-                            story_points_value = float(
-                                story_points_str.strip())
+                            story_points_value = float(story_points_str.strip())
                             total_story_points += story_points_value
                         except (ValueError, TypeError):
                             continue
@@ -1117,17 +1231,21 @@ def get_sprint_stats_for_developer(cursor, assignee, sprint_id, start_date, end_
                 # Try fallback parsing for status
                 try:
                     import ast
+
                     status_dict = ast.literal_eval(status_json)
-                    status_name = status_dict.get('name', '')
+                    status_name = status_dict.get("name", "")
 
                     if status_name in closed_statuses:
                         closed_count += 1
 
                         # Add story points if available
-                        if story_points_str and story_points_str.strip() and story_points_str != 'null':
+                        if (
+                            story_points_str
+                            and story_points_str.strip()
+                            and story_points_str != "null"
+                        ):
                             try:
-                                story_points_value = float(
-                                    story_points_str.strip())
+                                story_points_value = float(story_points_str.strip())
                                 total_story_points += story_points_value
                             except (ValueError, TypeError):
                                 continue
@@ -1152,7 +1270,8 @@ def display_sprint_stats_summary(sprint_analytics):
             continue
 
         console.print(
-            f"\n[bold cyan]Sprint: {sprint_info['name']} ({sprint_info['state']})[/bold cyan]")
+            f"\n[bold cyan]Sprint: {sprint_info['name']} ({sprint_info['state']})[/bold cyan]"
+        )
 
         table = Table(show_header=True, header_style="bold green")
         table.add_column("Developer")
@@ -1167,7 +1286,7 @@ def display_sprint_stats_summary(sprint_analytics):
                 str(dev_stats["commits_in_sprint"]),
                 str(dev_stats["issues_assigned_in_sprint"]),
                 str(dev_stats["issues_closed_in_sprint"]),
-                str(dev_stats["story_points_closed_in_sprint"])
+                str(dev_stats["story_points_closed_in_sprint"]),
             )
 
         console.print(table)
@@ -1179,18 +1298,18 @@ def display_existing_sprint_stats():
 
     if not os.path.exists(sprint_stats_file):
         console.print(
-            f"[bold red]No sprint statistics file found: {sprint_stats_file}[/bold red]")
+            f"[bold red]No sprint statistics file found: {sprint_stats_file}[/bold red]"
+        )
         input("Press Enter to return to the menu...")
         return
 
     try:
-        with open(sprint_stats_file, 'r') as f:
+        with open(sprint_stats_file, "r") as f:
             stats_data = json.load(f)
 
         sprint_analytics = stats_data.get("sprint_analytics", {})
         if not sprint_analytics:
-            console.print(
-                "[bold red]No sprint analytics found in the file.[/bold red]")
+            console.print("[bold red]No sprint analytics found in the file.[/bold red]")
             input("Press Enter to return to the menu...")
             return
 
@@ -1200,21 +1319,23 @@ def display_existing_sprint_stats():
         # Show file info
         generated_at = stats_data.get("generated_at", "Unknown")
         console.print(
-            f"\n[bold green]Sprint statistics loaded from: {sprint_stats_file}[/bold green]")
-        console.print(
-            f"[bold yellow]Generated at: {generated_at}[/bold yellow]")
+            f"\n[bold green]Sprint statistics loaded from: {sprint_stats_file}[/bold green]"
+        )
+        console.print(f"[bold yellow]Generated at: {generated_at}[/bold yellow]")
 
         input("\nPress Enter to return to the menu...")
 
     except Exception as e:
         console.print(
-            f"[bold red]Error reading sprint statistics file: {str(e)}[/bold red]")
+            f"[bold red]Error reading sprint statistics file: {str(e)}[/bold red]"
+        )
         input("Press Enter to return to the menu...")
 
 
 # ============================================================================
 # DEVELOPER ACTIVITY TRACKING (NEW)
 # ============================================================================
+
 
 def get_last_3_days_activity(cursor):
     """
@@ -1229,11 +1350,13 @@ def get_last_3_days_activity(cursor):
     cutoff_str = cutoff_date.isoformat()
 
     # Get valid team members (assignees from Jira, filtered by excluded emails)
-    cursor.execute(f"""
+    cursor.execute(
+        f"""
         SELECT DISTINCT assignee
         FROM {TABLE_NAME}
         WHERE assignee IS NOT NULL AND assignee != '' AND assignee != 'null'
-    """)
+    """
+    )
     assignees = [row[0] for row in cursor.fetchall()]
 
     # Filter out excluded emails and build valid email set
@@ -1246,125 +1369,137 @@ def get_last_3_days_activity(cursor):
             valid_assignees[email.lower()] = (name, email)
 
     # Dictionary to accumulate activity per developer
-    developer_activity = defaultdict(lambda: {
-        'email': '',
-        'name': '',
-        'jira_actions': 0,
-        'repo_actions': 0,
-        'breakdown': {
-            'issues_created': 0,
-            'issues_updated': 0,
-            'status_changes': 0,
-            'commits': 0
+    developer_activity = defaultdict(
+        lambda: {
+            "email": "",
+            "name": "",
+            "jira_actions": 0,
+            "repo_actions": 0,
+            "breakdown": {
+                "issues_created": 0,
+                "issues_updated": 0,
+                "status_changes": 0,
+                "commits": 0,
+            },
         }
-    })
+    )
 
     # 1. JIRA ACTIVITY
 
     # Issues created in last 3 days
-    cursor.execute(f"""
+    cursor.execute(
+        f"""
         SELECT creator FROM {TABLE_NAME}
         WHERE created >= ?
-    """, (cutoff_str,))
+    """,
+        (cutoff_str,),
+    )
     for (creator_json,) in cursor.fetchall():
         if creator_json:
             name, email = extract_developer_info(creator_json)
             # Only count if this person is a valid team member
             if email.lower() in valid_emails:
-                developer_activity[email]['email'] = email
-                developer_activity[email]['name'] = name
-                developer_activity[email]['breakdown']['issues_created'] += 1
-                developer_activity[email]['jira_actions'] += 1
+                developer_activity[email]["email"] = email
+                developer_activity[email]["name"] = name
+                developer_activity[email]["breakdown"]["issues_created"] += 1
+                developer_activity[email]["jira_actions"] += 1
 
     # Issues updated in last 3 days (attribute to assignee)
-    cursor.execute(f"""
+    cursor.execute(
+        f"""
         SELECT assignee FROM {TABLE_NAME}
         WHERE updated >= ? AND assignee IS NOT NULL AND assignee != ''
-    """, (cutoff_str,))
+    """,
+        (cutoff_str,),
+    )
     for (assignee_json,) in cursor.fetchall():
         if assignee_json:
             name, email = extract_developer_info(assignee_json)
             # Only count if this person is a valid team member
             if email.lower() in valid_emails:
-                developer_activity[email]['email'] = email
-                developer_activity[email]['name'] = name
-                developer_activity[email]['breakdown']['issues_updated'] += 1
-                developer_activity[email]['jira_actions'] += 1
+                developer_activity[email]["email"] = email
+                developer_activity[email]["name"] = name
+                developer_activity[email]["breakdown"]["issues_updated"] += 1
+                developer_activity[email]["jira_actions"] += 1
 
     # Status changes in last 3 days (attribute to assignee)
-    cursor.execute(f"""
+    cursor.execute(
+        f"""
         SELECT assignee FROM {TABLE_NAME}
         WHERE statuscategorychangedate >= ? AND assignee IS NOT NULL AND assignee != ''
-    """, (cutoff_str,))
+    """,
+        (cutoff_str,),
+    )
     for (assignee_json,) in cursor.fetchall():
         if assignee_json:
             name, email = extract_developer_info(assignee_json)
             # Only count if this person is a valid team member
             if email.lower() in valid_emails:
-                developer_activity[email]['email'] = email
-                developer_activity[email]['name'] = name
-                developer_activity[email]['breakdown']['status_changes'] += 1
-                developer_activity[email]['jira_actions'] += 1
+                developer_activity[email]["email"] = email
+                developer_activity[email]["name"] = name
+                developer_activity[email]["breakdown"]["status_changes"] += 1
+                developer_activity[email]["jira_actions"] += 1
 
     # 2. REPO ACTIVITY
 
     # Commits in last 3 days
-    cursor.execute("""
+    cursor.execute(
+        """
         SELECT author_name, author_email, date
         FROM git_commits
         WHERE date IS NOT NULL
-    """)
+    """
+    )
 
     for author_name, author_email, date_str in cursor.fetchall():
         try:
             # Parse git date and check if within last 3 days
-            date_clean = re.sub(r'\s+[+-]\d{4}$', '', date_str.strip())
-            commit_date = datetime.strptime(date_clean, '%a %b %d %H:%M:%S %Y')
+            date_clean = re.sub(r"\s+[+-]\d{4}$", "", date_str.strip())
+            commit_date = datetime.strptime(date_clean, "%a %b %d %H:%M:%S %Y")
 
             if commit_date >= cutoff_date:
                 # Match to Jira user by email - only count if valid team member
                 if author_email and author_email.lower() in valid_emails:
                     # Use the name from Jira assignee data for consistency
-                    jira_name, jira_email = valid_assignees[author_email.lower(
-                    )]
-                    developer_activity[jira_email]['email'] = jira_email
-                    developer_activity[jira_email]['name'] = jira_name
-                    developer_activity[jira_email]['breakdown']['commits'] += 1
-                    developer_activity[jira_email]['repo_actions'] += 1
+                    jira_name, jira_email = valid_assignees[author_email.lower()]
+                    developer_activity[jira_email]["email"] = jira_email
+                    developer_activity[jira_email]["name"] = jira_name
+                    developer_activity[jira_email]["breakdown"]["commits"] += 1
+                    developer_activity[jira_email]["repo_actions"] += 1
         except:
             continue
 
     # 3. Calculate totals and convert to array
     developers = []
     for email, data in developer_activity.items():
-        if data['email']:  # Only include if we have email
-            data['total_activity'] = data['jira_actions'] + data['repo_actions']
+        if data["email"]:  # Only include if we have email
+            data["total_activity"] = data["jira_actions"] + data["repo_actions"]
             developers.append(data)
 
     # 4. Sort by total_activity (desc), then repo_actions (desc)
-    developers.sort(key=lambda x: (
-        x['total_activity'], x['repo_actions']), reverse=True)
+    developers.sort(
+        key=lambda x: (x["total_activity"], x["repo_actions"]), reverse=True
+    )
 
     # 5. Calculate summary
     summary = {
-        'total_jira_actions': sum(d['jira_actions'] for d in developers),
-        'total_repo_actions': sum(d['repo_actions'] for d in developers),
-        'total_activity': sum(d['total_activity'] for d in developers),
-        'active_developers': len(developers),
-        'most_active_developer': developers[0]['name'] if developers else 'None'
+        "total_jira_actions": sum(d["jira_actions"] for d in developers),
+        "total_repo_actions": sum(d["repo_actions"] for d in developers),
+        "total_activity": sum(d["total_activity"] for d in developers),
+        "active_developers": len(developers),
+        "most_active_developer": developers[0]["name"] if developers else "None",
     }
 
     return {
-        'period': {
-            'start': cutoff_date.isoformat(),
-            'end': datetime.now().isoformat()
-        },
-        'developers': developers,
-        'summary': summary
+        "period": {"start": cutoff_date.isoformat(), "end": datetime.now().isoformat()},
+        "developers": developers,
+        "summary": summary,
     }
 
 
-def get_sprint_activity(cursor, sprint_id, sprint_name, start_date, end_date, sprint_state):
+def get_sprint_activity(
+    cursor, sprint_id, sprint_name, start_date, end_date, sprint_state
+):
     """
     Get developer activity for a specific sprint.
     Returns dict with developers array and summary.
@@ -1374,18 +1509,19 @@ def get_sprint_activity(cursor, sprint_id, sprint_name, start_date, end_date, sp
 
     # Parse sprint dates
     try:
-        sprint_start = datetime.fromisoformat(
-            start_date.replace('Z', '+00:00'))
-        sprint_end = datetime.fromisoformat(end_date.replace('Z', '+00:00'))
+        sprint_start = datetime.fromisoformat(start_date.replace("Z", "+00:00"))
+        sprint_end = datetime.fromisoformat(end_date.replace("Z", "+00:00"))
     except:
         return None
 
     # Get valid team members (assignees from Jira, filtered by excluded emails)
-    cursor.execute(f"""
+    cursor.execute(
+        f"""
         SELECT DISTINCT assignee
         FROM {TABLE_NAME}
         WHERE assignee IS NOT NULL AND assignee != '' AND assignee != 'null'
-    """)
+    """
+    )
     assignees = [row[0] for row in cursor.fetchall()]
 
     # Filter out excluded emails and build valid email set
@@ -1398,143 +1534,163 @@ def get_sprint_activity(cursor, sprint_id, sprint_name, start_date, end_date, sp
             valid_assignees[email.lower()] = (name, email)
 
     # Dictionary to accumulate activity per developer
-    developer_activity = defaultdict(lambda: {
-        'email': '',
-        'name': '',
-        'jira_actions': 0,
-        'repo_actions': 0,
-        'breakdown': {
-            'issues_created': 0,
-            'issues_assigned': 0,
-            'issues_updated': 0,
-            'status_changes': 0,
-            'commits': 0
+    developer_activity = defaultdict(
+        lambda: {
+            "email": "",
+            "name": "",
+            "jira_actions": 0,
+            "repo_actions": 0,
+            "breakdown": {
+                "issues_created": 0,
+                "issues_assigned": 0,
+                "issues_updated": 0,
+                "status_changes": 0,
+                "commits": 0,
+            },
         }
-    })
+    )
 
     # 1. JIRA ACTIVITY
 
     # Issues created in sprint period
-    cursor.execute(f"""
+    cursor.execute(
+        f"""
         SELECT creator, created FROM {TABLE_NAME}
         WHERE created >= ? AND created <= ? AND creator IS NOT NULL AND creator != ''
-    """, (start_date, end_date))
+    """,
+        (start_date, end_date),
+    )
     for creator_json, created in cursor.fetchall():
         if creator_json:
             name, email = extract_developer_info(creator_json)
             # Only count if this person is a valid team member
             if email.lower() in valid_emails:
-                developer_activity[email]['email'] = email
-                developer_activity[email]['name'] = name
-                developer_activity[email]['breakdown']['issues_created'] += 1
-                developer_activity[email]['jira_actions'] += 1
+                developer_activity[email]["email"] = email
+                developer_activity[email]["name"] = name
+                developer_activity[email]["breakdown"]["issues_created"] += 1
+                developer_activity[email]["jira_actions"] += 1
 
     # Issues assigned to this sprint
-    cursor.execute(f"""
+    cursor.execute(
+        f"""
         SELECT assignee, customfield_10020 FROM {TABLE_NAME}
         WHERE customfield_10020 LIKE ? AND assignee IS NOT NULL AND assignee != ''
-    """, (f'%{sprint_id}%',))
+    """,
+        (f"%{sprint_id}%",),
+    )
     for assignee_json, sprints_json in cursor.fetchall():
         if assignee_json:
             name, email = extract_developer_info(assignee_json)
             # Only count if this person is a valid team member
             if email.lower() in valid_emails:
-                developer_activity[email]['email'] = email
-                developer_activity[email]['name'] = name
-                developer_activity[email]['breakdown']['issues_assigned'] += 1
-                developer_activity[email]['jira_actions'] += 1
+                developer_activity[email]["email"] = email
+                developer_activity[email]["name"] = name
+                developer_activity[email]["breakdown"]["issues_assigned"] += 1
+                developer_activity[email]["jira_actions"] += 1
 
     # Issues updated in sprint period (attribute to assignee)
-    cursor.execute(f"""
+    cursor.execute(
+        f"""
         SELECT assignee, updated FROM {TABLE_NAME}
         WHERE updated >= ? AND updated <= ? AND assignee IS NOT NULL AND assignee != ''
-    """, (start_date, end_date))
+    """,
+        (start_date, end_date),
+    )
     for assignee_json, updated in cursor.fetchall():
         if assignee_json:
             name, email = extract_developer_info(assignee_json)
             # Only count if this person is a valid team member
             if email.lower() in valid_emails:
-                developer_activity[email]['email'] = email
-                developer_activity[email]['name'] = name
-                developer_activity[email]['breakdown']['issues_updated'] += 1
-                developer_activity[email]['jira_actions'] += 1
+                developer_activity[email]["email"] = email
+                developer_activity[email]["name"] = name
+                developer_activity[email]["breakdown"]["issues_updated"] += 1
+                developer_activity[email]["jira_actions"] += 1
 
     # Status changes in sprint period (attribute to assignee)
-    cursor.execute(f"""
+    cursor.execute(
+        f"""
         SELECT assignee, statuscategorychangedate FROM {TABLE_NAME}
         WHERE statuscategorychangedate >= ? AND statuscategorychangedate <= ?
         AND assignee IS NOT NULL AND assignee != ''
-    """, (start_date, end_date))
+    """,
+        (start_date, end_date),
+    )
     for assignee_json, status_date in cursor.fetchall():
         if assignee_json:
             name, email = extract_developer_info(assignee_json)
             # Only count if this person is a valid team member
             if email.lower() in valid_emails:
-                developer_activity[email]['email'] = email
-                developer_activity[email]['name'] = name
-                developer_activity[email]['breakdown']['status_changes'] += 1
-                developer_activity[email]['jira_actions'] += 1
+                developer_activity[email]["email"] = email
+                developer_activity[email]["name"] = name
+                developer_activity[email]["breakdown"]["status_changes"] += 1
+                developer_activity[email]["jira_actions"] += 1
 
     # 2. REPO ACTIVITY
 
     # Commits in sprint period
-    cursor.execute("""
+    cursor.execute(
+        """
         SELECT author_name, author_email, date
         FROM git_commits
         WHERE date IS NOT NULL
-    """)
+    """
+    )
 
     sprint_start_date = sprint_start.date()
     sprint_end_date = sprint_end.date()
 
     for author_name, author_email, date_str in cursor.fetchall():
         try:
-            date_clean = re.sub(r'\s+[+-]\d{4}$', '', date_str.strip())
-            commit_date = datetime.strptime(date_clean, '%a %b %d %H:%M:%S %Y')
+            date_clean = re.sub(r"\s+[+-]\d{4}$", "", date_str.strip())
+            commit_date = datetime.strptime(date_clean, "%a %b %d %H:%M:%S %Y")
             commit_date_only = commit_date.date()
 
             if sprint_start_date <= commit_date_only <= sprint_end_date:
                 # Match to Jira user by email - only count if valid team member
                 if author_email and author_email.lower() in valid_emails:
                     # Use the name from Jira assignee data for consistency
-                    jira_name, jira_email = valid_assignees[author_email.lower(
-                    )]
-                    developer_activity[jira_email]['email'] = jira_email
-                    developer_activity[jira_email]['name'] = jira_name
-                    developer_activity[jira_email]['breakdown']['commits'] += 1
-                    developer_activity[jira_email]['repo_actions'] += 1
+                    jira_name, jira_email = valid_assignees[author_email.lower()]
+                    developer_activity[jira_email]["email"] = jira_email
+                    developer_activity[jira_email]["name"] = jira_name
+                    developer_activity[jira_email]["breakdown"]["commits"] += 1
+                    developer_activity[jira_email]["repo_actions"] += 1
         except:
             continue
 
     # 3. Calculate totals and convert to array
     developers = []
     for email, data in developer_activity.items():
-        if data['email']:
-            data['total_activity'] = data['jira_actions'] + data['repo_actions']
+        if data["email"]:
+            data["total_activity"] = data["jira_actions"] + data["repo_actions"]
             developers.append(data)
 
     # 4. Sort by total_activity (desc), then repo_actions (desc)
-    developers.sort(key=lambda x: (
-        x['total_activity'], x['repo_actions']), reverse=True)
+    developers.sort(
+        key=lambda x: (x["total_activity"], x["repo_actions"]), reverse=True
+    )
 
     # 5. Calculate summary
     summary = {
-        'total_developers': len(developers),
-        'total_jira_actions': sum(d['jira_actions'] for d in developers),
-        'total_repo_actions': sum(d['repo_actions'] for d in developers),
-        'total_activity': sum(d['total_activity'] for d in developers),
-        'avg_activity_per_developer': round(sum(d['total_activity'] for d in developers) / len(developers), 2) if developers else 0,
-        'most_active_developer': developers[0]['email'] if developers else None
+        "total_developers": len(developers),
+        "total_jira_actions": sum(d["jira_actions"] for d in developers),
+        "total_repo_actions": sum(d["repo_actions"] for d in developers),
+        "total_activity": sum(d["total_activity"] for d in developers),
+        "avg_activity_per_developer": (
+            round(sum(d["total_activity"] for d in developers) / len(developers), 2)
+            if developers
+            else 0
+        ),
+        "most_active_developer": developers[0]["email"] if developers else None,
     }
 
     return {
-        'sprint_id': sprint_id,
-        'sprint_name': sprint_name,
-        'sprint_state': sprint_state,
-        'start_date': start_date,
-        'end_date': end_date,
-        'developers': developers,
-        'summary': summary
+        "sprint_id": sprint_id,
+        "sprint_name": sprint_name,
+        "sprint_state": sprint_state,
+        "start_date": start_date,
+        "end_date": end_date,
+        "developers": developers,
+        "summary": summary,
     }
 
 
@@ -1544,59 +1700,70 @@ def calculate_developer_summary(cursor, sprint_activity_list):
     Returns array of developer summaries sorted by total activity.
     """
     # Aggregate activity per developer across all sprints
-    developer_totals = defaultdict(lambda: {
-        'email': '',
-        'name': '',
-        'total_activity_all_sprints': 0,
-        'total_jira_actions': 0,
-        'total_repo_actions': 0,
-        'sprints_participated': 0,
-        'sprint_breakdown': []
-    })
+    developer_totals = defaultdict(
+        lambda: {
+            "email": "",
+            "name": "",
+            "total_activity_all_sprints": 0,
+            "total_jira_actions": 0,
+            "total_repo_actions": 0,
+            "sprints_participated": 0,
+            "sprint_breakdown": [],
+        }
+    )
 
     # Accumulate from sprint data
     for sprint in sprint_activity_list:
-        for dev in sprint['developers']:
-            email = dev['email']
-            developer_totals[email]['email'] = email
-            developer_totals[email]['name'] = dev['name']
-            developer_totals[email]['total_activity_all_sprints'] += dev['total_activity']
-            developer_totals[email]['total_jira_actions'] += dev['jira_actions']
-            developer_totals[email]['total_repo_actions'] += dev['repo_actions']
-            developer_totals[email]['sprints_participated'] += 1
-            developer_totals[email]['sprint_breakdown'].append({
-                'sprint_name': sprint['sprint_name'],
-                'activity': dev['total_activity']
-            })
+        for dev in sprint["developers"]:
+            email = dev["email"]
+            developer_totals[email]["email"] = email
+            developer_totals[email]["name"] = dev["name"]
+            developer_totals[email]["total_activity_all_sprints"] += dev[
+                "total_activity"
+            ]
+            developer_totals[email]["total_jira_actions"] += dev["jira_actions"]
+            developer_totals[email]["total_repo_actions"] += dev["repo_actions"]
+            developer_totals[email]["sprints_participated"] += 1
+            developer_totals[email]["sprint_breakdown"].append(
+                {
+                    "sprint_name": sprint["sprint_name"],
+                    "activity": dev["total_activity"],
+                }
+            )
 
     # Get last 3 days activity for each developer
     last_3_days = get_last_3_days_activity(cursor)
-    last_3_days_map = {dev['email']: dev['total_activity']
-                       for dev in last_3_days['developers']}
+    last_3_days_map = {
+        dev["email"]: dev["total_activity"] for dev in last_3_days["developers"]
+    }
 
     # Convert to array and calculate averages
     developer_summary = []
     for email, data in developer_totals.items():
-        if data['email']:
+        if data["email"]:
             # Calculate average activity per sprint
-            avg_activity = round(
-                data['total_activity_all_sprints'] /
-                data['sprints_participated'], 2
-            ) if data['sprints_participated'] > 0 else 0
+            avg_activity = (
+                round(
+                    data["total_activity_all_sprints"] / data["sprints_participated"], 2
+                )
+                if data["sprints_participated"] > 0
+                else 0
+            )
 
             # Add fields that match what the HTML dashboard expects
-            data['avg_activity_per_sprint'] = avg_activity
-            data['last_3_days_activity'] = last_3_days_map.get(email, 0)
+            data["avg_activity_per_sprint"] = avg_activity
+            data["last_3_days_activity"] = last_3_days_map.get(email, 0)
             # Add aliases for consistency with sprint_activity format
-            data['total_activity'] = data['total_activity_all_sprints']
-            data['jira_actions'] = data['total_jira_actions']
-            data['repo_actions'] = data['total_repo_actions']
+            data["total_activity"] = data["total_activity_all_sprints"]
+            data["jira_actions"] = data["total_jira_actions"]
+            data["repo_actions"] = data["total_repo_actions"]
 
             developer_summary.append(data)
 
     # Sort by total_activity (desc), then repo_actions (desc)
-    developer_summary.sort(key=lambda x: (
-        x['total_activity'], x['repo_actions']), reverse=True)
+    developer_summary.sort(
+        key=lambda x: (x["total_activity"], x["repo_actions"]), reverse=True
+    )
 
     return developer_summary
 
@@ -1620,13 +1787,15 @@ def generate_developer_activity_json():
         cursor = conn.cursor()
 
         # Check if required tables exist
-        required_tables = [TABLE_NAME, 'git_commits', f'{TABLE_NAME}_sprints']
+        required_tables = [TABLE_NAME, "git_commits", f"{TABLE_NAME}_sprints"]
         for table in required_tables:
             cursor.execute(
-                f"SELECT name FROM sqlite_master WHERE type='table' AND name='{table}'")
+                f"SELECT name FROM sqlite_master WHERE type='table' AND name='{table}'"
+            )
             if not cursor.fetchone():
                 console.print(
-                    f"[bold red]Required table '{table}' not found.[/bold red]")
+                    f"[bold red]Required table '{table}' not found.[/bold red]"
+                )
                 input("Press Enter to return to the menu...")
                 return None
 
@@ -1635,11 +1804,13 @@ def generate_developer_activity_json():
         last_3_days = get_last_3_days_activity(cursor)
 
         # 2. Get all sprints
-        cursor.execute(f"""
+        cursor.execute(
+            f"""
             SELECT id, name, state, startDate, endDate 
             FROM {TABLE_NAME}_sprints 
             ORDER BY startDate DESC
-        """)
+        """
+        )
         sprints = cursor.fetchall()
 
         if not sprints:
@@ -1651,66 +1822,69 @@ def generate_developer_activity_json():
         console.print("[yellow]Calculating sprint activity...[/yellow]")
         sprint_activity = []
         for sprint_id, name, state, start, end in sprints:
-            activity = get_sprint_activity(
-                cursor, sprint_id, name, start, end, state)
+            activity = get_sprint_activity(cursor, sprint_id, name, start, end, state)
             if activity:
                 sprint_activity.append(activity)
 
         # 4. Calculate developer summary (all-time)
         console.print("[yellow]Calculating developer summaries...[/yellow]")
-        developer_summary = calculate_developer_summary(
-            cursor, sprint_activity)
+        developer_summary = calculate_developer_summary(cursor, sprint_activity)
 
         # 5. Calculate activity trends
         activity_trends = {
-            'by_sprint': [
+            "by_sprint": [
                 {
-                    'sprint_name': s['sprint_name'],
-                    'total_activity': s['summary']['total_activity'],
-                    'jira_actions': s['summary']['total_jira_actions'],
-                    'repo_actions': s['summary']['total_repo_actions']
+                    "sprint_name": s["sprint_name"],
+                    "total_activity": s["summary"]["total_activity"],
+                    "jira_actions": s["summary"]["total_jira_actions"],
+                    "repo_actions": s["summary"]["total_repo_actions"],
                 }
                 for s in sprint_activity
             ],
-            'top_performers_last_3_days': last_3_days['developers'][:5],
-            'top_performers_current_sprint': sprint_activity[0]['developers'][:5] if sprint_activity else []
+            "top_performers_last_3_days": last_3_days["developers"][:5],
+            "top_performers_current_sprint": (
+                sprint_activity[0]["developers"][:5] if sprint_activity else []
+            ),
         }
 
         # 6. Build final JSON structure
         final_json = {
-            'generated_at': datetime.now().isoformat(),
-            'metadata': {
-                'total_developers': len(developer_summary),
-                'total_sprints': len(sprint_activity),
-                'active_sprint': sprint_activity[0]['sprint_name'] if sprint_activity else None,
-                'data_period': {
-                    'earliest': sprints[-1][3] if sprints else None,
-                    'latest': datetime.now().isoformat()
-                }
+            "generated_at": datetime.now().isoformat(),
+            "metadata": {
+                "total_developers": len(developer_summary),
+                "total_sprints": len(sprint_activity),
+                "active_sprint": (
+                    sprint_activity[0]["sprint_name"] if sprint_activity else None
+                ),
+                "data_period": {
+                    "earliest": sprints[-1][3] if sprints else None,
+                    "latest": datetime.now().isoformat(),
+                },
             },
-            'last_3_days_activity': last_3_days,
-            'sprint_activity': sprint_activity,
-            'developer_summary': developer_summary,
-            'activity_trends': activity_trends
+            "last_3_days_activity": last_3_days,
+            "sprint_activity": sprint_activity,
+            "developer_summary": developer_summary,
+            "activity_trends": activity_trends,
         }
 
         # 7. Backup existing file
         if os.path.exists(output_file):
-            timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
             backup_file = f"ux/web/data/developer_activity_backup_{timestamp}.json"
             shutil.copy2(output_file, backup_file)
             console.print(f"[yellow]Backed up to: {backup_file}[/yellow]")
 
         # 8. Write JSON file
         os.makedirs(os.path.dirname(output_file), exist_ok=True)
-        with open(output_file, 'w') as f:
+        with open(output_file, "w") as f:
             json.dump(final_json, f, indent=2, default=str)
 
         # 9. Display summary
         display_developer_activity_summary(last_3_days, sprint_activity)
 
         console.print(
-            f"\n[bold green]Developer activity JSON created: {output_file}[/bold green]")
+            f"\n[bold green]Developer activity JSON created: {output_file}[/bold green]"
+        )
         input("\nPress Enter to return to the menu...")
         return output_file
 
@@ -1720,7 +1894,8 @@ def display_developer_activity_summary(last_3_days, sprint_activity):
 
     # Last 3 days summary
     console.print(
-        "\n[bold yellow]Last 3 Days Activity - Top 10 Developers:[/bold yellow]")
+        "\n[bold yellow]Last 3 Days Activity - Top 10 Developers:[/bold yellow]"
+    )
     table = Table(show_header=True, header_style="bold green")
     table.add_column("Rank")
     table.add_column("Developer")
@@ -1729,14 +1904,14 @@ def display_developer_activity_summary(last_3_days, sprint_activity):
     table.add_column("Jira Actions")
     table.add_column("Repo Actions")
 
-    for idx, dev in enumerate(last_3_days['developers'][:10], 1):
+    for idx, dev in enumerate(last_3_days["developers"][:10], 1):
         table.add_row(
             str(idx),
-            dev['name'],
-            dev['email'],
-            str(dev['total_activity']),
-            str(dev['jira_actions']),
-            str(dev['repo_actions'])
+            dev["name"],
+            dev["email"],
+            str(dev["total_activity"]),
+            str(dev["jira_actions"]),
+            str(dev["repo_actions"]),
         )
 
     console.print(table)
@@ -1745,7 +1920,8 @@ def display_developer_activity_summary(last_3_days, sprint_activity):
     if sprint_activity:
         current_sprint = sprint_activity[0]
         console.print(
-            f"\n[bold yellow]Current Sprint: {current_sprint['sprint_name']} - Top 10 Developers:[/bold yellow]")
+            f"\n[bold yellow]Current Sprint: {current_sprint['sprint_name']} - Top 10 Developers:[/bold yellow]"
+        )
 
         table2 = Table(show_header=True, header_style="bold green")
         table2.add_column("Rank")
@@ -1755,24 +1931,25 @@ def display_developer_activity_summary(last_3_days, sprint_activity):
         table2.add_column("Jira Actions")
         table2.add_column("Repo Actions")
 
-        for idx, dev in enumerate(current_sprint['developers'][:10], 1):
+        for idx, dev in enumerate(current_sprint["developers"][:10], 1):
             table2.add_row(
                 str(idx),
-                dev['name'],
-                dev['email'],
-                str(dev['total_activity']),
-                str(dev['jira_actions']),
-                str(dev['repo_actions'])
+                dev["name"],
+                dev["email"],
+                str(dev["total_activity"]),
+                str(dev["jira_actions"]),
+                str(dev["repo_actions"]),
             )
 
         console.print(table2)
 
         # Sprint summary stats
-        summary = current_sprint['summary']
+        summary = current_sprint["summary"]
         console.print(f"\n[bold cyan]Sprint Summary:[/bold cyan]")
         console.print(f"  Total Developers: {summary['total_developers']}")
         console.print(f"  Total Activity: {summary['total_activity']}")
         console.print(f"  Total Jira Actions: {summary['total_jira_actions']}")
         console.print(f"  Total Repo Actions: {summary['total_repo_actions']}")
         console.print(
-            f"  Avg Activity per Developer: {summary['avg_activity_per_developer']}")
+            f"  Avg Activity per Developer: {summary['avg_activity_per_developer']}"
+        )
