@@ -115,6 +115,7 @@
             const [activityData, setActivityData] = useState(null);
             const [loading, setLoading] = useState(true);
             const [selectedDeveloper, setSelectedDeveloper] = useState(null);
+            const [selectedSprint, setSelectedSprint] = useState('all');
 
             useEffect(() => {
                 Promise.all([
@@ -132,15 +133,37 @@
                 });
             }, []);
 
+            const availableSprints = useMemo(() => {
+                if (!sprintData?.sprint_analytics) return [];
+                
+                return Object.entries(sprintData.sprint_analytics)
+                    .map(([key, sprint]) => ({
+                        key,
+                        name: sprint.sprint_info.name,
+                        state: sprint.sprint_info.state,
+                        startDate: sprint.sprint_info.start_date,
+                        endDate: sprint.sprint_info.end_date
+                    }))
+                    .sort((a, b) => new Date(b.startDate) - new Date(a.startDate));
+            }, [sprintData]);
+
             const teamMetrics = useMemo(() => {
                 if (!sprintData?.sprint_analytics) return null;
 
-                const allDevs = [];
-                Object.values(sprintData.sprint_analytics).forEach(sprint => {
-                    Object.values(sprint.developers).forEach(dev => {
-                        allDevs.push(dev);
+                let allDevs = [];
+
+                if (selectedSprint === 'all') {
+                    Object.values(sprintData.sprint_analytics).forEach(sprint => {
+                        Object.values(sprint.developers).forEach(dev => {
+                            allDevs.push(dev);
+                        });
                     });
-                });
+                } else {
+                    const sprint = sprintData.sprint_analytics[selectedSprint];
+                    if (sprint) {
+                        allDevs = Object.values(sprint.developers);
+                    }
+                }
 
                 const totalCommits = allDevs.reduce((sum, d) => sum + d.commits_in_sprint, 0);
                 const totalIssuesAssigned = allDevs.reduce((sum, d) => sum + d.issues_assigned_in_sprint, 0);
@@ -154,33 +177,50 @@
                     avgStoryPoints: allDevs.length > 0 ? totalStoryPoints / allDevs.length : 0,
                     avgCompletionRate: totalIssuesAssigned > 0 ? (totalIssuesClosed / totalIssuesAssigned) * 100 : 0
                 };
-            }, [sprintData]);
+            }, [sprintData, selectedSprint]);
 
             const developerSummaries = useMemo(() => {
                 if (!sprintData?.sprint_analytics || !activityData?.developer_summary) return [];
 
                 const devMap = {};
 
-                Object.values(sprintData.sprint_analytics).forEach(sprint => {
-                    Object.values(sprint.developers).forEach(dev => {
-                        if (!devMap[dev.email]) {
+                if (selectedSprint === 'all') {
+                    Object.values(sprintData.sprint_analytics).forEach(sprint => {
+                        Object.values(sprint.developers).forEach(dev => {
+                            if (!devMap[dev.email]) {
+                                devMap[dev.email] = {
+                                    name: dev.name,
+                                    email: dev.email,
+                                    totalCommits: 0,
+                                    totalIssuesAssigned: 0,
+                                    totalIssuesClosed: 0,
+                                    totalStoryPoints: 0,
+                                    sprintCount: 0
+                                };
+                            }
+                            devMap[dev.email].totalCommits += dev.commits_in_sprint;
+                            devMap[dev.email].totalIssuesAssigned += dev.issues_assigned_in_sprint;
+                            devMap[dev.email].totalIssuesClosed += dev.issues_closed_in_sprint;
+                            devMap[dev.email].totalStoryPoints += dev.story_points_closed_in_sprint;
+                            devMap[dev.email].sprintCount += 1;
+                        });
+                    });
+                } else {
+                    const sprint = sprintData.sprint_analytics[selectedSprint];
+                    if (sprint) {
+                        Object.values(sprint.developers).forEach(dev => {
                             devMap[dev.email] = {
                                 name: dev.name,
                                 email: dev.email,
-                                totalCommits: 0,
-                                totalIssuesAssigned: 0,
-                                totalIssuesClosed: 0,
-                                totalStoryPoints: 0,
-                                sprintCount: 0
+                                totalCommits: dev.commits_in_sprint,
+                                totalIssuesAssigned: dev.issues_assigned_in_sprint,
+                                totalIssuesClosed: dev.issues_closed_in_sprint,
+                                totalStoryPoints: dev.story_points_closed_in_sprint,
+                                sprintCount: 1
                             };
-                        }
-                        devMap[dev.email].totalCommits += dev.commits_in_sprint;
-                        devMap[dev.email].totalIssuesAssigned += dev.issues_assigned_in_sprint;
-                        devMap[dev.email].totalIssuesClosed += dev.issues_closed_in_sprint;
-                        devMap[dev.email].totalStoryPoints += dev.story_points_closed_in_sprint;
-                        devMap[dev.email].sprintCount += 1;
-                    });
-                });
+                        });
+                    }
+                }
 
                 const summaries = Object.values(devMap).map(dev => {
                     const activityInfo = activityData.developer_summary.find(d => d.email === dev.email);
@@ -196,7 +236,7 @@
                 });
 
                 return summaries.sort((a, b) => (b.totalCommits + b.totalIssuesAssigned) - (a.totalCommits + a.totalIssuesAssigned));
-            }, [sprintData, activityData]);
+            }, [sprintData, activityData, selectedSprint]);
 
             const getPerformanceIndicator = (value, avg) => {
                 const ratio = avg > 0 ? (value / avg) * 100 : 100;
@@ -209,8 +249,16 @@
             const radarData = useMemo(() => {
                 if (!selectedDeveloper || !teamMetrics) return null;
 
+                const labelPrefix = selectedSprint === 'all' ? 'Avg ' : '';
+
                 return {
-                    labels: ['Commits', 'Issues Assigned', 'Issues Closed', 'Story Points', 'Activity/Sprint'],
+                    labels: [
+                        `${labelPrefix}Commits`, 
+                        `${labelPrefix}Issues Assigned`, 
+                        `${labelPrefix}Issues Closed`, 
+                        `${labelPrefix}Story Points`, 
+                        'Activity/Sprint'
+                    ],
                     datasets: [
                         {
                             label: selectedDeveloper.name,
@@ -240,7 +288,7 @@
                         }
                     ]
                 };
-            }, [selectedDeveloper, teamMetrics, developerSummaries]);
+            }, [selectedDeveloper, teamMetrics, developerSummaries, selectedSprint]);
 
             if (loading) return (
                 <div className="min-h-screen flex items-center justify-center">
@@ -266,7 +314,19 @@
                     <div className="container mx-auto px-6 py-8">
                         {/* Team Metrics Overview */}
                         <div className="bg-white rounded-xl shadow-lg p-6 mb-8">
-                            <h2 className="text-2xl font-bold text-gray-800 mb-6">Team Performance Benchmarks</h2>
+                            <h2 className="text-2xl font-bold text-gray-800 mb-2">
+                                Team Performance Benchmarks
+                                {selectedSprint !== 'all' && (
+                                    <span className="text-base font-normal text-gray-600 ml-2">
+                                        (for {availableSprints.find(s => s.key === selectedSprint)?.name})
+                                    </span>
+                                )}
+                            </h2>
+                            <p className="text-sm text-gray-600 mb-6">
+                                {selectedSprint === 'all' 
+                                    ? 'Averaged across all sprints and developers' 
+                                    : 'Team average for selected sprint only'}
+                            </p>
                             <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
                                 <div className="text-center">
                                     <p className="text-2xl font-bold text-telus-purple">{teamMetrics?.avgCommits.toFixed(1)}</p>
@@ -291,21 +351,58 @@
                             </div>
                         </div>
 
-                        {/* Developer Selection */}
+                        {/* Sprint & Developer Selection */}
                         <div className="bg-white rounded-xl shadow-lg p-6 mb-8">
-                            <h3 className="text-lg font-semibold text-gray-800 mb-4">Select Developer to Compare</h3>
-                            <select
-                                value={selectedDeveloper?.email || ''}
-                                onChange={(e) => setSelectedDeveloper(developerSummaries.find(d => d.email === e.target.value))}
-                                className="w-full md:w-auto px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-telus-purple"
-                            >
-                                <option value="">Choose a developer...</option>
-                                {developerSummaries.map(dev => (
-                                    <option key={dev.email} value={dev.email}>
-                                        {dev.name} ({dev.sprintCount} sprints)
-                                    </option>
-                                ))}
-                            </select>
+                            <h3 className="text-lg font-semibold text-gray-800 mb-4">Filters</h3>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                                        Sprint
+                                    </label>
+                                    <select
+                                        value={selectedSprint}
+                                        onChange={(e) => {
+                                            setSelectedSprint(e.target.value);
+                                            setSelectedDeveloper(null);
+                                        }}
+                                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-telus-purple"
+                                    >
+                                        <option value="all">All Sprints (Average)</option>
+                                        {availableSprints.map(sprint => (
+                                            <option key={sprint.key} value={sprint.key}>
+                                                {sprint.name} ({sprint.state})
+                                            </option>
+                                        ))}
+                                    </select>
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                                        Developer
+                                    </label>
+                                    <select
+                                        value={selectedDeveloper?.email || ''}
+                                        onChange={(e) => setSelectedDeveloper(developerSummaries.find(d => d.email === e.target.value))}
+                                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-telus-purple"
+                                    >
+                                        <option value="">Choose a developer...</option>
+                                        {developerSummaries.map(dev => (
+                                            <option key={dev.email} value={dev.email}>
+                                                {dev.name} {selectedSprint === 'all' ? `(${dev.sprintCount} sprints)` : ''}
+                                            </option>
+                                        ))}
+                                    </select>
+                                </div>
+                            </div>
+                            {selectedSprint !== 'all' && (
+                                <div className="mt-4 p-3 bg-blue-50 rounded-lg">
+                                    <p className="text-sm text-blue-800">
+                                        <span className="font-semibold">Sprint Context:</span>{' '}
+                                        {availableSprints.find(s => s.key === selectedSprint)?.name} •{' '}
+                                        {new Date(availableSprints.find(s => s.key === selectedSprint)?.startDate).toLocaleDateString()} -{' '}
+                                        {new Date(availableSprints.find(s => s.key === selectedSprint)?.endDate).toLocaleDateString()}
+                                    </p>
+                                </div>
+                            )}
                         </div>
 
                         {/* Developer Comparison */}
@@ -317,7 +414,12 @@
                                         <div>
                                             <h2 className="text-3xl font-bold mb-2">{selectedDeveloper.name}</h2>
                                             <p className="text-lg opacity-90">{selectedDeveloper.email}</p>
-                                            <p className="text-sm opacity-75 mt-2">Active in {selectedDeveloper.sprintCount} sprint{selectedDeveloper.sprintCount !== 1 ? 's' : ''}</p>
+                                            <p className="text-sm opacity-75 mt-2">
+                                                {selectedSprint === 'all' 
+                                                    ? `Average across ${selectedDeveloper.sprintCount} sprint${selectedDeveloper.sprintCount !== 1 ? 's' : ''}`
+                                                    : `Performance in ${availableSprints.find(s => s.key === selectedSprint)?.name}`
+                                                }
+                                            </p>
                                         </div>
                                         <div className="text-right">
                                             <p className="text-5xl font-bold">{selectedDeveloper.completionRate.toFixed(0)}%</p>
@@ -330,14 +432,18 @@
                                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
                                     <div className="bg-white rounded-xl shadow-lg p-6">
                                         <div className="flex items-center justify-between mb-2">
-                                            <p className="text-gray-600 text-sm font-medium">Avg Commits/Sprint</p>
+                                            <p className="text-gray-600 text-sm font-medium">
+                                                {selectedSprint === 'all' ? 'Avg Commits/Sprint' : 'Commits'}
+                                            </p>
                                             {(() => {
                                                 const indicator = getPerformanceIndicator(selectedDeveloper.avgCommits, teamMetrics.avgCommits);
                                                 return <span className={`${indicator.color} text-xl font-bold`}>{indicator.icon}</span>;
                                             })()}
                                         </div>
                                         <p className="text-3xl font-bold text-telus-purple">{selectedDeveloper.avgCommits.toFixed(1)}</p>
-                                        <p className="text-sm text-gray-500 mt-1">Team avg: {teamMetrics.avgCommits.toFixed(1)}</p>
+                                        <p className="text-sm text-gray-500 mt-1">
+                                            Team {selectedSprint === 'all' ? 'avg' : 'avg in sprint'}: {teamMetrics.avgCommits.toFixed(1)}
+                                        </p>
                                         <div className="mt-3 bg-gray-200 rounded-full h-2">
                                             <div 
                                                 className="bg-telus-purple rounded-full h-2" 
@@ -348,14 +454,18 @@
 
                                     <div className="bg-white rounded-xl shadow-lg p-6">
                                         <div className="flex items-center justify-between mb-2">
-                                            <p className="text-gray-600 text-sm font-medium">Avg Issues Assigned</p>
+                                            <p className="text-gray-600 text-sm font-medium">
+                                                {selectedSprint === 'all' ? 'Avg Issues Assigned' : 'Issues Assigned'}
+                                            </p>
                                             {(() => {
                                                 const indicator = getPerformanceIndicator(selectedDeveloper.avgIssuesAssigned, teamMetrics.avgIssuesAssigned);
                                                 return <span className={`${indicator.color} text-xl font-bold`}>{indicator.icon}</span>;
                                             })()}
                                         </div>
                                         <p className="text-3xl font-bold text-telus-blue">{selectedDeveloper.avgIssuesAssigned.toFixed(1)}</p>
-                                        <p className="text-sm text-gray-500 mt-1">Team avg: {teamMetrics.avgIssuesAssigned.toFixed(1)}</p>
+                                        <p className="text-sm text-gray-500 mt-1">
+                                            Team {selectedSprint === 'all' ? 'avg' : 'avg in sprint'}: {teamMetrics.avgIssuesAssigned.toFixed(1)}
+                                        </p>
                                         <div className="mt-3 bg-gray-200 rounded-full h-2">
                                             <div 
                                                 className="bg-telus-blue rounded-full h-2" 
@@ -366,14 +476,18 @@
 
                                     <div className="bg-white rounded-xl shadow-lg p-6">
                                         <div className="flex items-center justify-between mb-2">
-                                            <p className="text-gray-600 text-sm font-medium">Avg Issues Closed</p>
+                                            <p className="text-gray-600 text-sm font-medium">
+                                                {selectedSprint === 'all' ? 'Avg Issues Closed' : 'Issues Closed'}
+                                            </p>
                                             {(() => {
                                                 const indicator = getPerformanceIndicator(selectedDeveloper.avgIssuesClosed, teamMetrics.avgIssuesClosed);
                                                 return <span className={`${indicator.color} text-xl font-bold`}>{indicator.icon}</span>;
                                             })()}
                                         </div>
                                         <p className="text-3xl font-bold text-telus-green">{selectedDeveloper.avgIssuesClosed.toFixed(1)}</p>
-                                        <p className="text-sm text-gray-500 mt-1">Team avg: {teamMetrics.avgIssuesClosed.toFixed(1)}</p>
+                                        <p className="text-sm text-gray-500 mt-1">
+                                            Team {selectedSprint === 'all' ? 'avg' : 'avg in sprint'}: {teamMetrics.avgIssuesClosed.toFixed(1)}
+                                        </p>
                                         <div className="mt-3 bg-gray-200 rounded-full h-2">
                                             <div 
                                                 className="bg-telus-green rounded-full h-2" 
@@ -384,14 +498,18 @@
 
                                     <div className="bg-white rounded-xl shadow-lg p-6">
                                         <div className="flex items-center justify-between mb-2">
-                                            <p className="text-gray-600 text-sm font-medium">Avg Story Points</p>
+                                            <p className="text-gray-600 text-sm font-medium">
+                                                {selectedSprint === 'all' ? 'Avg Story Points' : 'Story Points'}
+                                            </p>
                                             {(() => {
                                                 const indicator = getPerformanceIndicator(selectedDeveloper.avgStoryPoints, teamMetrics.avgStoryPoints);
                                                 return <span className={`${indicator.color} text-xl font-bold`}>{indicator.icon}</span>;
                                             })()}
                                         </div>
                                         <p className="text-3xl font-bold text-orange-600">{selectedDeveloper.avgStoryPoints.toFixed(1)}</p>
-                                        <p className="text-sm text-gray-500 mt-1">Team avg: {teamMetrics.avgStoryPoints.toFixed(1)}</p>
+                                        <p className="text-sm text-gray-500 mt-1">
+                                            Team {selectedSprint === 'all' ? 'avg' : 'avg in sprint'}: {teamMetrics.avgStoryPoints.toFixed(1)}
+                                        </p>
                                         <div className="mt-3 bg-gray-200 rounded-full h-2">
                                             <div 
                                                 className="bg-orange-600 rounded-full h-2" 
@@ -422,7 +540,7 @@
                                                     backgroundColor: '#4B0082'
                                                 },
                                                 {
-                                                    label: 'Team Average (per dev)',
+                                                    label: selectedSprint === 'all' ? 'Team Average (per dev)' : 'Team Average',
                                                     data: [
                                                         teamMetrics.avgCommits * selectedDeveloper.sprintCount,
                                                         teamMetrics.avgIssuesAssigned * selectedDeveloper.sprintCount,
@@ -433,13 +551,20 @@
                                                 }
                                             ]
                                         }}
-                                        title="Total Contributions vs Team Benchmark"
+                                        title={selectedSprint === 'all' ? 'Total Contributions vs Team Benchmark' : 'Sprint Performance vs Team Average'}
                                     />
                                 </div>
 
                                 {/* Performance Summary */}
                                 <div className="bg-white rounded-xl shadow-lg p-6">
-                                    <h3 className="text-xl font-bold text-gray-800 mb-4">Performance Summary</h3>
+                                    <h3 className="text-xl font-bold text-gray-800 mb-4">
+                                        Performance Summary
+                                        {selectedSprint !== 'all' && (
+                                            <span className="text-sm font-normal text-gray-600 ml-2">
+                                                (Sprint-specific)
+                                            </span>
+                                        )}
+                                    </h3>
                                     <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                                         <div>
                                             <h4 className="font-semibold text-gray-700 mb-3">Strengths</h4>
@@ -447,7 +572,11 @@
                                                 {selectedDeveloper.avgCommits >= teamMetrics.avgCommits && (
                                                     <li className="flex items-center text-green-600">
                                                         <span className="mr-2">✓</span>
-                                                        <span className="text-sm">Above average commit activity</span>
+                                                        <span className="text-sm">
+                                                            {selectedSprint === 'all' 
+                                                                ? 'Above average commit activity' 
+                                                                : 'Above team average in commits'}
+                                                        </span>
                                                     </li>
                                                 )}
                                                 {selectedDeveloper.avgIssuesClosed >= teamMetrics.avgIssuesClosed && (
@@ -473,10 +602,24 @@
                                         <div>
                                             <h4 className="font-semibold text-gray-700 mb-3">Key Metrics</h4>
                                             <ul className="space-y-2 text-sm text-gray-600">
-                                                <li>Total Commits: <span className="font-semibold text-gray-800">{selectedDeveloper.totalCommits}</span></li>
-                                                <li>Total Issues Closed: <span className="font-semibold text-gray-800">{selectedDeveloper.totalIssuesClosed}</span></li>
-                                                <li>Total Story Points: <span className="font-semibold text-gray-800">{selectedDeveloper.totalStoryPoints.toFixed(1)}</span></li>
-                                                <li>Sprint Participation: <span className="font-semibold text-gray-800">{selectedDeveloper.sprintCount} sprints</span></li>
+                                                <li>
+                                                    {selectedSprint === 'all' ? 'Total' : 'Sprint'} Commits: 
+                                                    <span className="font-semibold text-gray-800"> {selectedDeveloper.totalCommits}</span>
+                                                </li>
+                                                <li>
+                                                    {selectedSprint === 'all' ? 'Total' : 'Sprint'} Issues Closed: 
+                                                    <span className="font-semibold text-gray-800"> {selectedDeveloper.totalIssuesClosed}</span>
+                                                </li>
+                                                <li>
+                                                    {selectedSprint === 'all' ? 'Total' : 'Sprint'} Story Points: 
+                                                    <span className="font-semibold text-gray-800"> {selectedDeveloper.totalStoryPoints.toFixed(1)}</span>
+                                                </li>
+                                                {selectedSprint === 'all' && (
+                                                    <li>
+                                                        Sprint Participation: 
+                                                        <span className="font-semibold text-gray-800"> {selectedDeveloper.sprintCount} sprints</span>
+                                                    </li>
+                                                )}
                                             </ul>
                                         </div>
                                         <div>
@@ -515,11 +658,21 @@
                                     <thead className="bg-gradient-to-r from-telus-purple to-telus-light-purple text-white">
                                         <tr>
                                             <th className="px-4 py-3 text-left text-sm font-semibold">Developer</th>
-                                            <th className="px-4 py-3 text-center text-sm font-semibold">Sprints</th>
-                                            <th className="px-4 py-3 text-center text-sm font-semibold">Avg Commits</th>
-                                            <th className="px-4 py-3 text-center text-sm font-semibold">Avg Issues</th>
-                                            <th className="px-4 py-3 text-center text-sm font-semibold">Avg Closed</th>
-                                            <th className="px-4 py-3 text-center text-sm font-semibold">Avg Points</th>
+                                            <th className="px-4 py-3 text-center text-sm font-semibold">
+                                                {selectedSprint === 'all' ? 'Sprints' : 'Participated'}
+                                            </th>
+                                            <th className="px-4 py-3 text-center text-sm font-semibold">
+                                                {selectedSprint === 'all' ? 'Avg Commits' : 'Commits'}
+                                            </th>
+                                            <th className="px-4 py-3 text-center text-sm font-semibold">
+                                                {selectedSprint === 'all' ? 'Avg Issues' : 'Issues'}
+                                            </th>
+                                            <th className="px-4 py-3 text-center text-sm font-semibold">
+                                                {selectedSprint === 'all' ? 'Avg Closed' : 'Closed'}
+                                            </th>
+                                            <th className="px-4 py-3 text-center text-sm font-semibold">
+                                                {selectedSprint === 'all' ? 'Avg Points' : 'Points'}
+                                            </th>
                                             <th className="px-4 py-3 text-center text-sm font-semibold">Completion %</th>
                                         </tr>
                                     </thead>
