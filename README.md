@@ -166,12 +166,14 @@ The CLI provides the following options:
    - Save to `ux/web/data/developer_activity.json`
 
 5. **Generate dashboards**
-   - **Option B (Recommended): Vite SPA Bundle**
-     - Builds modern React SPA with embedded data
-     - Output: `dist/reports/` directory with fully self-contained bundle
+   - **Option B (Recommended): Vite SPA Single-File Bundle**
+     - Builds modern React SPA into a single HTML file
+     - Output: `dist/reports/index.html` (one file, ~597KB)
+     - All JavaScript, CSS, and data inlined
      - Features sidebar navigation between all 4 dashboards
      - Modern UI with interactive charts and filtering
      - TypeScript-based for better code quality
+     - Can be shared as a single file attachment
    - **Option A (Deprecated): Legacy HTML Files**
      - Generates individual standalone HTML files
      - Output: `dist/` directory with separate HTML files
@@ -225,17 +227,20 @@ The CLI provides the following options:
 
 #### Vite SPA Bundle (Option 5b - Recommended)
 When using option 5b, the tool generates:
-- `dist/reports/index.html`: Single entry point with embedded data (~120KB)
-- `dist/reports/assets/index-[hash].js`: Bundled React application (~467KB)
-- `dist/reports/assets/index-[hash].css`: Bundled styles (~24KB)
-- Total bundle size: ~608KB (self-contained)
+- `dist/reports/index.html`: **Single self-contained HTML file (~597KB)**
+  - All JavaScript inlined
+  - All CSS inlined
+  - All data embedded
+  - No external dependencies
 
 The SPA bundle:
+- **Truly single-file**: Everything in one HTML file
 - Contains all 4 dashboards in a single application
 - Has all data embedded directly in the HTML
 - Works completely offline without any external requests
-- Can be deployed to any static web server
+- Can be shared as a single file or deployed to any web server
 - Supports client-side routing for seamless navigation
+- Can be opened directly in any browser
 - Viewed on any device (desktop, tablet, mobile)
 
 #### Legacy HTML Files (Option 5a - Deprecated)

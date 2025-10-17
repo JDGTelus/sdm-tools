@@ -365,27 +365,38 @@ def generate_vite_spa():
 
             # Check if build output exists
             dist_dir = "dist/reports"
-            if os.path.exists(dist_dir):
+            source_html = os.path.join(dist_dir, "index.html")
+            
+            if os.path.exists(source_html):
+                # Get file size for display
+                file_size = os.path.getsize(source_html)
+                size_mb = file_size / (1024 * 1024)
+                size_kb = file_size / 1024
+                
+                if size_mb >= 1:
+                    size_str = f"{size_mb:.2f} MB"
+                else:
+                    size_str = f"{size_kb:.2f} KB"
+                
                 console.print(
-                    "[bold green]✓ Vite SPA bundle generated successfully![/bold green]"
+                    "[bold green]✓ Single-file SPA bundle generated successfully![/bold green]"
                 )
-                console.print(f"[bold cyan]Output location: {dist_dir}/[/bold cyan]")
+                console.print(f"[bold cyan]Output: {source_html}[/bold cyan]")
+                console.print(f"[bold cyan]Size: {size_str} (single self-contained HTML file)[/bold cyan]")
                 console.print(
-                    f"[bold cyan]  • index.html (with embedded data)[/bold cyan]"
+                    "[bold yellow]This file contains:[/bold yellow]"
                 )
+                console.print("[bold yellow]  • All 4 dashboards with navigation[/bold yellow]")
+                console.print("[bold yellow]  • Embedded data (no external files needed)[/bold yellow]")
+                console.print("[bold yellow]  • Inlined JavaScript and CSS[/bold yellow]")
+                console.print("[bold yellow]  • Works completely offline[/bold yellow]")
                 console.print(
-                    f"[bold cyan]  • assets/ (bundled JS and CSS)[/bold cyan]"
-                )
-                console.print(
-                    "[bold yellow]This is a self-contained bundle that can be deployed anywhere.[/bold yellow]"
-                )
-                console.print(
-                    "[bold yellow]Open dist/reports/index.html in a browser to view the dashboards.[/bold yellow]"
+                    f"\n[bold green]Open {source_html} in any browser to view.[/bold green]"
                 )
                 return True
             else:
                 console.print(
-                    "[bold red]Build completed but output directory not found.[/bold red]"
+                    "[bold red]Build completed but index.html not found.[/bold red]"
                 )
                 return False
 
@@ -470,27 +481,38 @@ def generate_vite_spa():
 
             # Check if build output exists
             dist_dir = "dist/reports"
-            if os.path.exists(dist_dir):
+            source_html = os.path.join(dist_dir, "index.html")
+            
+            if os.path.exists(source_html):
+                # Get file size for display
+                file_size = os.path.getsize(source_html)
+                size_mb = file_size / (1024 * 1024)
+                size_kb = file_size / 1024
+                
+                if size_mb >= 1:
+                    size_str = f"{size_mb:.2f} MB"
+                else:
+                    size_str = f"{size_kb:.2f} KB"
+                
                 console.print(
-                    "[bold green]✓ Vite SPA bundle generated successfully![/bold green]"
+                    "[bold green]✓ Single-file SPA bundle generated successfully![/bold green]"
                 )
-                console.print(f"[bold cyan]Output location: {dist_dir}/[/bold cyan]")
+                console.print(f"[bold cyan]Output: {source_html}[/bold cyan]")
+                console.print(f"[bold cyan]Size: {size_str} (single self-contained HTML file)[/bold cyan]")
                 console.print(
-                    f"[bold cyan]  • index.html (with embedded data)[/bold cyan]"
+                    "[bold yellow]This file contains:[/bold yellow]"
                 )
+                console.print("[bold yellow]  • All 4 dashboards with navigation[/bold yellow]")
+                console.print("[bold yellow]  • Embedded data (no external files needed)[/bold yellow]")
+                console.print("[bold yellow]  • Inlined JavaScript and CSS[/bold yellow]")
+                console.print("[bold yellow]  • Works completely offline[/bold yellow]")
                 console.print(
-                    f"[bold cyan]  • assets/ (bundled JS and CSS)[/bold cyan]"
-                )
-                console.print(
-                    "[bold yellow]This is a self-contained bundle that can be deployed anywhere.[/bold yellow]"
-                )
-                console.print(
-                    "[bold yellow]Open dist/reports/index.html in a browser to view the dashboards.[/bold yellow]"
+                    f"\n[bold green]Open {source_html} in any browser to view.[/bold green]"
                 )
                 return True
             else:
                 console.print(
-                    "[bold red]Build completed but output directory not found.[/bold red]"
+                    "[bold red]Build completed but index.html not found.[/bold red]"
                 )
                 return False
 

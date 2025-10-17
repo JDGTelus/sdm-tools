@@ -1,5 +1,6 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
+import { viteSingleFile } from 'vite-plugin-singlefile'
 import path from 'path'
 import fs from 'fs'
 
@@ -46,7 +47,11 @@ function embedDataPlugin() {
 
 // https://vite.dev/config/
 export default defineConfig({
-  plugins: [react(), embedDataPlugin()],
+  plugins: [
+    react(), 
+    embedDataPlugin(),
+    viteSingleFile()
+  ],
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),
@@ -55,9 +60,11 @@ export default defineConfig({
   build: {
     outDir: '../dist/reports',
     emptyOutDir: true,
+    cssCodeSplit: false,
+    assetsInlineLimit: 100000000,
     rollupOptions: {
       output: {
-        // Create single bundle for self-contained deployment
+        inlineDynamicImports: true,
         manualChunks: undefined,
       }
     }
