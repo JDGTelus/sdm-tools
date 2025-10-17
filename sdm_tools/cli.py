@@ -299,15 +299,225 @@ def handle_developer_activity_option():
             input("Press Enter to return to the menu...")
 
 
-def handle_html_generation_option():
-    """Handle the HTML generation option - creates self-sufficient HTML dashboards for all HTML files in ux/web."""
+def generate_vite_spa():
+    """Generate the Vite SPA bundle with embedded data."""
+    import shutil
+    import subprocess
+
+    console.print("[bold yellow]Generating Vite SPA bundle...[/bold yellow]")
+
+    try:
+        # Check if required JSON files exist
+        sprint_stats_file = "ux/web/data/team_sprint_stats.json"
+        activity_file = "ux/web/data/developer_activity.json"
+
+        if not os.path.exists(sprint_stats_file):
+            console.print(
+                f"[bold red]Sprint stats file not found at {sprint_stats_file}.[/bold red]"
+            )
+            console.print(
+                "[bold yellow]Please generate sprint analytics first (option 3).[/bold yellow]"
+            )
+            input("Press Enter to return to the menu...")
+            return False
+
+        if not os.path.exists(activity_file):
+            console.print(
+                f"[bold red]Developer activity file not found at {activity_file}.[/bold red]"
+            )
+            console.print(
+                "[bold yellow]Please generate developer activity first (option 4).[/bold yellow]"
+            )
+            input("Press Enter to return to the menu...")
+            return False
+
+        # Save current directory
+        original_cwd = os.getcwd()
+
+        try:
+            # Change to reports-spa directory
+            spa_dir = "reports-spa"
+            if not os.path.exists(spa_dir):
+                console.print(
+                    f"[bold red]Vite SPA directory not found at {spa_dir}.[/bold red]"
+                )
+                input("Press Enter to return to the menu...")
+                return False
+
+            os.chdir(spa_dir)
+
+            # Run the build
+            console.print(
+                "[bold cyan]Building Vite SPA (this may take a moment)...[/bold cyan]"
+            )
+            result = subprocess.run(
+                ["npm", "run", "build"], capture_output=True, text=True
+            )
+
+            if result.returncode != 0:
+                console.print(f"[bold red]Build failed with error:[/bold red]")
+                console.print(result.stderr)
+                input("Press Enter to return to the menu...")
+                return False
+
+            # Return to original directory
+            os.chdir(original_cwd)
+
+            # Check if build output exists
+            dist_dir = "dist/reports"
+            if os.path.exists(dist_dir):
+                console.print(
+                    "[bold green]✓ Vite SPA bundle generated successfully![/bold green]"
+                )
+                console.print(f"[bold cyan]Output location: {dist_dir}/[/bold cyan]")
+                console.print(
+                    f"[bold cyan]  • index.html (with embedded data)[/bold cyan]"
+                )
+                console.print(
+                    f"[bold cyan]  • assets/ (bundled JS and CSS)[/bold cyan]"
+                )
+                console.print(
+                    "[bold yellow]This is a self-contained bundle that can be deployed anywhere.[/bold yellow]"
+                )
+                console.print(
+                    "[bold yellow]Open dist/reports/index.html in a browser to view the dashboards.[/bold yellow]"
+                )
+                return True
+            else:
+                console.print(
+                    "[bold red]Build completed but output directory not found.[/bold red]"
+                )
+                return False
+
+        finally:
+            # Always restore original directory
+            os.chdir(original_cwd)
+
+    except subprocess.CalledProcessError as e:
+        console.print(f"[bold red]Error running build command: {str(e)}[/bold red]")
+        return False
+    except Exception as e:
+        console.print(f"[bold red]Error generating Vite SPA: {str(e)}[/bold red]")
+        import traceback
+
+        traceback.print_exc()
+        return False
+
+
+def generate_vite_spa():
+    """Generate the Vite SPA bundle with embedded data."""
+    import shutil
+    import subprocess
+
+    console.print("[bold yellow]Generating Vite SPA bundle...[/bold yellow]")
+
+    try:
+        # Check if required JSON files exist
+        sprint_stats_file = "ux/web/data/team_sprint_stats.json"
+        activity_file = "ux/web/data/developer_activity.json"
+
+        if not os.path.exists(sprint_stats_file):
+            console.print(
+                f"[bold red]Sprint stats file not found at {sprint_stats_file}.[/bold red]"
+            )
+            console.print(
+                "[bold yellow]Please generate sprint analytics first (option 3).[/bold yellow]"
+            )
+            input("Press Enter to return to the menu...")
+            return False
+
+        if not os.path.exists(activity_file):
+            console.print(
+                f"[bold red]Developer activity file not found at {activity_file}.[/bold red]"
+            )
+            console.print(
+                "[bold yellow]Please generate developer activity first (option 4).[/bold yellow]"
+            )
+            input("Press Enter to return to the menu...")
+            return False
+
+        # Save current directory
+        original_cwd = os.getcwd()
+
+        try:
+            # Change to reports-spa directory
+            spa_dir = "reports-spa"
+            if not os.path.exists(spa_dir):
+                console.print(
+                    f"[bold red]Vite SPA directory not found at {spa_dir}.[/bold red]"
+                )
+                input("Press Enter to return to the menu...")
+                return False
+
+            os.chdir(spa_dir)
+
+            # Run the build
+            console.print(
+                "[bold cyan]Building Vite SPA (this may take a moment)...[/bold cyan]"
+            )
+            result = subprocess.run(
+                ["npm", "run", "build"], capture_output=True, text=True
+            )
+
+            if result.returncode != 0:
+                console.print(f"[bold red]Build failed with error:[/bold red]")
+                console.print(result.stderr)
+                input("Press Enter to return to the menu...")
+                return False
+
+            # Return to original directory
+            os.chdir(original_cwd)
+
+            # Check if build output exists
+            dist_dir = "dist/reports"
+            if os.path.exists(dist_dir):
+                console.print(
+                    "[bold green]✓ Vite SPA bundle generated successfully![/bold green]"
+                )
+                console.print(f"[bold cyan]Output location: {dist_dir}/[/bold cyan]")
+                console.print(
+                    f"[bold cyan]  • index.html (with embedded data)[/bold cyan]"
+                )
+                console.print(
+                    f"[bold cyan]  • assets/ (bundled JS and CSS)[/bold cyan]"
+                )
+                console.print(
+                    "[bold yellow]This is a self-contained bundle that can be deployed anywhere.[/bold yellow]"
+                )
+                console.print(
+                    "[bold yellow]Open dist/reports/index.html in a browser to view the dashboards.[/bold yellow]"
+                )
+                return True
+            else:
+                console.print(
+                    "[bold red]Build completed but output directory not found.[/bold red]"
+                )
+                return False
+
+        finally:
+            # Always restore original directory
+            os.chdir(original_cwd)
+
+    except subprocess.CalledProcessError as e:
+        console.print(f"[bold red]Error running build command: {str(e)}[/bold red]")
+        return False
+    except Exception as e:
+        console.print(f"[bold red]Error generating Vite SPA: {str(e)}[/bold red]")
+        import traceback
+
+        traceback.print_exc()
+        return False
+
+
+def generate_legacy_html():
+    """Generate legacy standalone HTML dashboards (deprecated)."""
     import json
     import glob
     from datetime import datetime
     import shutil
 
     console.print(
-        "[bold yellow]Generating self-sufficient HTML dashboards...[/bold yellow]"
+        "[bold yellow]Generating legacy standalone HTML dashboards...[/bold yellow]"
     )
 
     try:
@@ -496,7 +706,7 @@ def handle_html_generation_option():
 
         if generated_files:
             console.print(
-                f"[bold green]Successfully generated {len(generated_files)} self-sufficient HTML dashboard(s)![/bold green]"
+                f"[bold green]Successfully generated {len(generated_files)} legacy HTML dashboard(s)![/bold green]"
             )
             for file in generated_files:
                 console.print(f"[bold cyan]  • {file}[/bold cyan]")
@@ -514,6 +724,49 @@ def handle_html_generation_option():
         )
 
     input("Press Enter to return to the menu...")
+
+
+def handle_html_generation_option():
+    """Handle the HTML generation option - offers choice between legacy HTML and Vite SPA."""
+    console.print("[bold green]Choose dashboard format:[/bold green]")
+    console.print(
+        "[bold cyan]  a. Legacy standalone HTML files (deprecated)[/bold cyan]"
+    )
+    console.print("[bold cyan]  b. Vite SPA bundle (recommended)[/bold cyan]")
+
+    choice = (
+        console.input("[bold green]Enter choice (a/b): [/bold green]").strip().lower()
+    )
+
+    if choice == "b":
+        generate_vite_spa()
+        input("Press Enter to return to the menu...")
+        return
+    elif choice == "a":
+        console.print(
+            "[bold yellow]⚠️  Note: Legacy HTML generation is deprecated and will be removed in a future version.[/bold yellow]"
+        )
+        console.print(
+            "[bold yellow]Please consider using the Vite SPA (option b) for better maintainability.[/bold yellow]"
+        )
+        proceed = (
+            console.input(
+                "[bold yellow]Continue with legacy HTML generation? (y/N): [/bold yellow]"
+            )
+            .strip()
+            .lower()
+        )
+
+        if proceed != "y" and proceed != "yes":
+            console.print("[bold cyan]Cancelled. Returning to menu...[/bold cyan]")
+            input("Press Enter to return to the menu...")
+            return
+
+        generate_legacy_html()
+    else:
+        console.print("[bold red]Invalid choice. Returning to menu...[/bold red]")
+        input("Press Enter to return to the menu...")
+        return
 
 
 @cli.command()

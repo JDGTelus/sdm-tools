@@ -21,14 +21,25 @@ SDM-Tools is a comprehensive command-line interface (CLI) tool designed for Soft
 - **Last 3 Days Activity**: Real-time tracking of recent developer activity
 
 ### Interactive Dashboards
-- **Self-Sufficient HTML Dashboards**: Generate standalone HTML files with embedded data and styles
-- **Multiple Dashboard Types**:
-  - **Sprint Analytics Dashboard**: Sprint-focused activity with story points tracking
-  - **KPI Dashboard**: Key performance indicators and team metrics
-  - **Developer Activity Dashboard**: Individual developer activity with sprint breakdowns and recent activity
-- **Responsive Design**: Modern, mobile-friendly interface using TailwindCSS
-- **Real-time Data**: Embedded JSON data for instant loading without external dependencies
-- **Interactive Charts**: Pie charts and bar charts for visual data representation
+
+#### Vite SPA (Recommended)
+- **Modern React-based SPA**: Single-page application built with React, TypeScript, and Vite
+- **Self-Contained Bundle**: All data and assets embedded at build time
+- **Four Integrated Dashboards**:
+  - **Team Sprint Dashboard**: Sprint-focused activity with developer performance cards
+  - **Team KPI Dashboard**: Key performance indicators and team rankings
+  - **Developer Activity Dashboard**: Individual activity tracking with sprint filtering and charts
+  - **Developer Comparison Dashboard**: Compare individual performance against team benchmarks
+- **Sidebar Navigation**: Seamless navigation between all dashboards
+- **Interactive Visualizations**: Radar charts, pie charts, and bar charts using Chart.js
+- **Responsive Design**: Mobile-friendly interface with Tailwind CSS
+- **Offline Capable**: No external API calls, works completely offline
+- **TypeScript Support**: Full type safety and modern development experience
+
+#### Legacy HTML Dashboards (Deprecated)
+- **Standalone HTML Files**: Individual HTML files with embedded data (will be removed in future version)
+- **Limited Navigation**: Each dashboard is a separate file
+- **Use Vite SPA Instead**: Recommended for better maintainability and user experience
 
 ## Setup
 
@@ -37,6 +48,8 @@ SDM-Tools is a comprehensive command-line interface (CLI) tool designed for Soft
 - Python 3.6 or higher
 - Jira account with API access
 - Local repository with commit history
+- Node.js 20.19+ or 22.12+ (for Vite SPA generation)
+- npm (comes with Node.js)
 
 ### Jira API Token
 
@@ -62,9 +75,16 @@ To generate a Jira API token:
      ```bash
      .venv\Scripts\activate
      ```
-3. **Install dependencies**:
+3. **Install Python dependencies**:
    ```bash
    pip install -r requirements.txt
+   ```
+
+4. **Install Node.js dependencies** (for Vite SPA):
+   ```bash
+   cd reports-spa
+   npm install
+   cd ..
    ```
 
 ### Environment Variables
@@ -145,56 +165,88 @@ The CLI provides the following options:
    - Provide all-time developer summaries with sprint breakdowns
    - Save to `ux/web/data/developer_activity.json`
 
-5. **Generate self-sufficient HTML dashboard**
-   - Automatically process all HTML files in `ux/web/` directory
-   - Generate standalone HTML files in the `dist/` directory
-   - Embed CSS styles and JSON data for offline viewing
-   - Create timestamped backups of existing files
-   - Support multiple dashboard types (sprint analytics, KPI, developer activity)
-   - Smart detection of correct data source based on HTML filename
+5. **Generate dashboards**
+   - **Option B (Recommended): Vite SPA Bundle**
+     - Builds modern React SPA with embedded data
+     - Output: `dist/reports/` directory with fully self-contained bundle
+     - Features sidebar navigation between all 4 dashboards
+     - Modern UI with interactive charts and filtering
+     - TypeScript-based for better code quality
+   - **Option A (Deprecated): Legacy HTML Files**
+     - Generates individual standalone HTML files
+     - Output: `dist/` directory with separate HTML files
+     - No navigation between dashboards
+     - Will be removed in a future version
 
 6. **Exit**
 
-### Dashboard Features
+### Dashboard Features (Vite SPA)
 
-#### Sprint Analytics Dashboard
-- **Sprint-based Tracking**: Shows activity organized by sprint periods
-- **Story Points Integration**: Dedicated tracking of story points per sprint
-- **Interactive Table**: Sortable table with all developer metrics
-- **Individual Cards**: Detailed cards for each developer with sprint breakdown
-- **Issue Codes Display**: Visual badges showing relevant issue codes
-- **Commit Activity**: Git commit tracking aligned with sprint periods
+#### Team Sprint Dashboard (Landing Page)
+- **Sprint Filtering**: Filter by sprint or view all sprints
+- **Developer Performance Cards**: Visual cards showing key metrics per developer
+- **Sprint Overview Cards**: Sprint-level statistics and summaries
+- **Performance Table**: Comprehensive table with all developer metrics
+- **Aggregated Metrics**: Team-wide statistics and averages
 
-#### KPI Dashboard
-- **Key Performance Indicators**: Comprehensive team and individual KPIs
-- **Sprint Progress**: Visual representation of sprint completion rates
-- **Developer Performance**: Individual developer statistics and trends
-- **Issue Resolution**: Tracking of issue resolution rates and patterns
-- **Modern UI**: Responsive design with gradient backgrounds and hover effects
+#### Team KPI Dashboard
+- **Productivity KPIs**: Comprehensive productivity scoring
+- **Completion Rate Tracking**: Story completion percentages
+- **Story Points Analysis**: Sprint-based story points tracking
+- **Developer Rankings**: Performance-based leaderboards
+- **Trend Visualization**: Historical performance trends
 
 #### Developer Activity Dashboard
-- **Individual Developer Focus**: Detailed view of each developer's contributions
 - **Sprint Filtering**: View activity for specific sprints or all-time summary
 - **Last 3 Days Activity**: Real-time tracking of recent developer work
-- **Visual Charts**: Pie charts for activity distribution and bar charts for Jira vs Repo actions
-- **Comprehensive Metrics**: Track Jira actions (issues created/updated/assigned/status changes) and repo actions (commits)
-- **Sprint Breakdown**: See each developer's activity across all sprints they participated in
-- **Average Activity**: Calculate average activity per sprint for performance insights
+- **Activity Distribution**: Pie chart showing top 10 developers by activity
+- **Jira vs Repo Actions**: Bar chart comparing Jira and repository activity
+- **Comprehensive Table**: Detailed activity breakdown with average per sprint
+- **Activity Metrics**: Track issues created, updated, status changes, and commits
+
+#### Developer Comparison Dashboard
+- **Team Benchmarks**: View team average metrics across all sprints
+- **Sprint-Specific Analysis**: Filter by individual sprint for detailed comparison
+- **Developer Selection**: Choose any developer to compare against team average
+- **Performance Indicators**: Visual indicators (▲▲, ▲, ●, ▼) showing performance vs team
+- **Radar Chart**: Multi-dimensional performance profile comparison
+- **Bar Chart**: Total contributions vs team benchmark
+- **Performance Summary**: Automated strengths, key metrics, and improvement areas
+- **Interactive Table**: Click any developer row to view detailed comparison
+- **Completion Rate**: Individual vs team completion percentage
+
+### Dashboard Navigation (Vite SPA)
+- **Sidebar Menu**: Persistent sidebar with collapsible design
+- **Active Route Highlighting**: Visual indication of current dashboard
+- **Seamless Transitions**: Client-side routing for instant navigation
+- **Mobile Responsive**: Sidebar collapses on mobile devices
 
 ### Generated Files
 
-When using option 5, the tool generates:
-- `dist/team-sprint-stats.html`: Self-sufficient sprint analytics dashboard
-- `dist/team-sprint-kpi-dashboard.html`: Self-sufficient KPI dashboard
-- `dist/developer-activity-dashboard.html`: Self-sufficient developer activity dashboard
+#### Vite SPA Bundle (Option 5b - Recommended)
+When using option 5b, the tool generates:
+- `dist/reports/index.html`: Single entry point with embedded data (~120KB)
+- `dist/reports/assets/index-[hash].js`: Bundled React application (~467KB)
+- `dist/reports/assets/index-[hash].css`: Bundled styles (~24KB)
+- Total bundle size: ~608KB (self-contained)
+
+The SPA bundle:
+- Contains all 4 dashboards in a single application
+- Has all data embedded directly in the HTML
+- Works completely offline without any external requests
+- Can be deployed to any static web server
+- Supports client-side routing for seamless navigation
+- Viewed on any device (desktop, tablet, mobile)
+
+#### Legacy HTML Files (Option 5a - Deprecated)
+When using option 5a, the tool generates:
+- `dist/team-sprint-dashboard.html`: Sprint analytics dashboard
+- `dist/team-sprint-kpi-dashboard.html`: KPI dashboard
+- `dist/developer-activity-dashboard.html`: Activity dashboard
+- `dist/developer-comparison-dashboard.html`: Comparison dashboard
 - Timestamped backups of any existing files
 
-These files can be:
-- Opened directly in any web browser
-- Shared without external dependencies
-- Deployed to web servers for team access
-- Used offline without internet connectivity
-- Viewed on any device (desktop, tablet, mobile)
+**Note**: Legacy HTML generation is deprecated and will be removed in a future version.
 
 ## Data Structure
 
@@ -231,25 +283,37 @@ The developer activity feature provides:
 
 ```
 sdm-tools/
-├── sdm_tools/           # Main package
-├── ux/web/              # Dashboard templates and assets
-│   ├── *.html          # Dashboard templates
+├── sdm_tools/              # Main package
+├── reports-spa/            # Vite SPA project (NEW)
+│   ├── src/
+│   │   ├── components/    # Reusable React components
+│   │   ├── pages/         # Dashboard pages
+│   │   ├── data/          # Data access layer
+│   │   └── styles/        # CSS styles
+│   ├── package.json       # Node.js dependencies
+│   ├── vite.config.ts     # Vite configuration
+│   └── tsconfig.json      # TypeScript configuration
+├── ux/web/                 # Legacy dashboard templates (DEPRECATED)
+│   ├── *.html             # Legacy dashboard templates
 │   ├── shared-dashboard-styles.css
-│   └── data/           # JSON data files
-├── dist/               # Generated self-sufficient dashboards
-├── requirements.txt    # Python dependencies
-├── .env               # Environment configuration
-└── README.md          # This file
+│   └── data/              # JSON data files
+├── dist/
+│   ├── reports/           # Vite SPA output (recommended)
+│   └── *.html             # Legacy HTML files (deprecated)
+├── requirements.txt        # Python dependencies
+├── .env                   # Environment configuration
+└── README.md             # This file
 ```
 
 ## Notes
 
 - **Configuration**: All required environment variables must be set before running the tool
 - **Data Persistence**: All data is stored in SQLite database for fast access and reliability
-- **Automatic Backups**: Existing files are automatically backed up with timestamps
+- **Vite SPA Recommended**: The new Vite SPA provides better maintainability and user experience
+- **Legacy Deprecation**: Legacy HTML generation (option 5a) is deprecated and will be removed
 - **Responsive Design**: Dashboards work on desktop, tablet, and mobile devices
-- **Offline Capability**: Generated HTML files work without internet connectivity
-- **Extensible**: Easy to add new dashboard types by creating HTML templates in `ux/web/`
+- **Offline Capability**: Both Vite SPA and legacy HTML work without internet connectivity
+- **Self-Contained Bundles**: All data is embedded at build time, no external API calls
 
 ## Troubleshooting
 
@@ -260,14 +324,20 @@ sdm-tools/
 4. **File Permissions**: Check that the tool has write access to create database and output files
 
 ### Dashboard Generation
-- If dashboards don't generate, ensure JSON data files exist:
-  - Run option 3 for sprint analytics dashboard
-  - Run option 4 for developer activity dashboard
+
+#### Vite SPA (Option 5b)
+- If build fails, ensure JSON data files exist:
+  - Run option 3 to generate sprint analytics (`ux/web/data/team_sprint_stats.json`)
+  - Run option 4 to generate developer activity (`ux/web/data/developer_activity.json`)
+- Verify Node.js and npm are installed (`node --version` should show 20.19+ or 22.12+)
+- Check that `reports-spa/` directory exists with `package.json`
+- Run `npm install` in the `reports-spa/` directory if dependencies are missing
+- Build output will be in `dist/reports/` directory
+
+#### Legacy HTML (Option 5a - Deprecated)
+- Ensure JSON data files exist (run options 3 and 4)
 - Check that the `ux/web/` directory contains the HTML template files
 - Verify the `dist/` directory is writable
-- The tool automatically detects which JSON file to use based on the HTML filename:
-  - Files with "activity" use `developer_activity.json`
-  - Files with "sprint" use `team_sprint_stats.json`
-  - Files with "kpi" use appropriate KPI data
+- The tool automatically detects which JSON file to use based on the HTML filename
 
 Feedback is welcome juan.gramajo@telus.com

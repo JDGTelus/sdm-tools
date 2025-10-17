@@ -1,6 +1,12 @@
-# Dashboard Templates
+# ⚠️ DEPRECATED: Legacy Dashboard Templates
 
-This directory contains HTML dashboard templates that are converted into standalone reports.
+**This directory is deprecated. Please use the Vite SPA in `reports-spa/` instead.**
+
+See [DEPRECATED.md](./DEPRECATED.md) for migration information.
+
+---
+
+This directory contains legacy HTML dashboard templates that are converted into standalone reports.
 
 ## Template Files
 
@@ -32,9 +38,26 @@ This directory contains HTML dashboard templates that are converted into standal
 
 - Outputs: Same name in `dist/` folder as standalone files
 
-## Generation Process
+## Generation Process (Legacy - Not Recommended)
 
-Run option 5 in the CLI to generate standalone HTML files that:
+Run option 5 in the CLI, then choose option **A** (deprecated) to generate standalone HTML files that:
 - Embed CSS from `shared-dashboard-styles.css`
 - Embed JSON data directly in the HTML
 - Can be opened directly in any browser without external dependencies
+
+**⚠️ Warning**: This approach is deprecated. Use option **B** (Vite SPA) instead for:
+- Better navigation between dashboards
+- Modern React-based UI
+- TypeScript support
+- Improved maintainability
+
+## Recommended Alternative
+
+Use the Vite SPA located in `reports-spa/`:
+- Modern React + TypeScript application
+- All 4 dashboards with sidebar navigation
+- Same self-contained bundle approach
+- Better user experience
+- Future-proof architecture
+
+Generate with: CLI option 5, then choose option **B**
