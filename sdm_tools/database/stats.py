@@ -2364,3 +2364,194 @@ def generate_daily_report_json(target_date=None, output_file=None):
     except Exception as e:
         console.print(f"[bold red]Error writing JSON file: {e}[/bold red]")
         return None
+
+
+def display_daily_report_summary(daily_activity_data=None, json_file=None):
+    """Display daily activity report in a formatted Rich table.
+    
+    Args:
+        daily_activity_data: Dict from get_daily_activity_by_buckets(), or None to load from JSON
+        json_file: Path to JSON file to load. If None, uses default location.
+    """
+    # Load data from JSON if not provided
+    if daily_activity_data is None:
+        if json_file is None:
+            json_file = "ux/web/data/daily_activity_report.json"
+        
+        if not os.path.exists(json_file):
+            console.print(f"[bold red]Daily report file not found: {json_file}[/bold red]")
+            console.print("[bold yellow]Generate it first using option 5.[/bold yellow]")
+            return
+        
+        try:
+            with open(json_file, 'r') as f:
+                report_data = json.load(f)
+            
+            # Extract data from JSON structure
+            metadata = report_data.get('metadata', {})
+            developers_list = report_data.get('developers', [])
+            summary = report_data.get('summary', {})
+            
+        except Exception as e:
+            console.print(f"[bold red]Error loading JSON file: {e}[/bold red]")
+            return
+    else:
+        # Convert dict to list format
+        developers_list = list(daily_activity_data.values())
+        developers_list.sort(key=lambda d: d['daily_total']['total'], reverse=True)
+        metadata = None
+        summary = None
+    
+    if not developers_list:
+        console.print("[bold yellow]No developer activity data to display.[/bold yellow]")
+        return
+    
+    # Display header
+    console.print("\n[bold cyan]═══════════════════════════════════════════════════════════════════════[/bold cyan]")
+    console.print("[bold cyan]                    DAILY ACTIVITY REPORT                              [/bold cyan]")
+    console.print("[bold cyan]═══════════════════════════════════════════════════════════════════════[/bold cyan]")
+    
+    if metadata:
+        console.print(f"\n[bold yellow]Report Date:[/bold yellow] {metadata.get('report_date', 'N/A')}")
+        console.print(f"[bold yellow]Timezone:[/bold yellow] {metadata.get('timezone', 'N/A')}")
+        console.print(f"[bold yellow]Generated:[/bold yellow] {report_data.get('generated_at', 'N/A')}\n")
+    
+    # Create Rich table
+    table = Table(show_header=True, header_style="bold cyan", title="Activity by Time Bucket", 
+                  title_style="bold magenta", border_style="cyan")
+    
+    # Add columns
+    table.add_column("Developer", style="bold white", width=25)
+    table.add_column("10am-12pm", justify="center", width=12)
+    table.add_column("12pm-2pm", justify="center", width=12)
+    table.add_column("2pm-4pm", justify="center", width=12)
+    table.add_column("4pm-6pm", justify="center", width=12)
+    table.add_column("Off-Hours", justify="center", width=12, style="yellow")
+    table.add_column("Total", justify="center", width=10, style="bold green")
+    
+    # Helper function to format cell with color based on activity level
+    def format_cell(count, jira, repo):
+        """Format cell with color coding based on activity level."""
+        if count == 0:
+            return "[dim]-[/dim]"
+        elif count >= 10:
+            color = "bold green"
+        elif count >= 5:
+            color = "green"
+        elif count >= 3:
+            color = "yellow"
+        else:
+            color = "white"
+        
+        return f"[{color}]{count}[/{color}] [dim]({jira}J/{repo}R)[/dim]"
+    
+    # Add rows for each developer (show top 15 most active)
+    total_jira = 0
+    total_repo = 0
+    total_activity = 0
+    bucket_totals = {
+        "10am-12pm": 0,
+        "12pm-2pm": 0,
+        "2pm-4pm": 0,
+        "4pm-6pm": 0,
+        "off_hours": 0
+    }
+    
+    displayed_count = 0
+    max_display = 15
+    
+    for dev in developers_list:
+        if dev['daily_total']['total'] == 0:
+            continue  # Skip developers with no activity
+        
+        if displayed_count >= max_display:
+            break
+        
+        name = dev['name'][:24]  # Truncate long names
+        
+        # Format each bucket
+        bucket_10_12 = format_cell(
+            dev['buckets']['10am-12pm']['total'],
+            dev['buckets']['10am-12pm']['jira'],
+            dev['buckets']['10am-12pm']['repo']
+        )
+        bucket_12_2 = format_cell(
+            dev['buckets']['12pm-2pm']['total'],
+            dev['buckets']['12pm-2pm']['jira'],
+            dev['buckets']['12pm-2pm']['repo']
+        )
+        bucket_2_4 = format_cell(
+            dev['buckets']['2pm-4pm']['total'],
+            dev['buckets']['2pm-4pm']['jira'],
+            dev['buckets']['2pm-4pm']['repo']
+        )
+        bucket_4_6 = format_cell(
+            dev['buckets']['4pm-6pm']['total'],
+            dev['buckets']['4pm-6pm']['jira'],
+            dev['buckets']['4pm-6pm']['repo']
+        )
+        off_hours = format_cell(
+            dev['off_hours']['total'],
+            dev['off_hours']['jira'],
+            dev['off_hours']['repo']
+        )
+        
+        total = f"[bold]{dev['daily_total']['total']}[/bold]"
+        
+        table.add_row(name, bucket_10_12, bucket_12_2, bucket_2_4, bucket_4_6, off_hours, total)
+        
+        # Accumulate totals
+        total_jira += dev['daily_total']['jira']
+        total_repo += dev['daily_total']['repo']
+        total_activity += dev['daily_total']['total']
+        
+        bucket_totals["10am-12pm"] += dev['buckets']['10am-12pm']['total']
+        bucket_totals["12pm-2pm"] += dev['buckets']['12pm-2pm']['total']
+        bucket_totals["2pm-4pm"] += dev['buckets']['2pm-4pm']['total']
+        bucket_totals["4pm-6pm"] += dev['buckets']['4pm-6pm']['total']
+        bucket_totals["off_hours"] += dev['off_hours']['total']
+        
+        displayed_count += 1
+    
+    # Add separator
+    table.add_row("─" * 24, "─" * 10, "─" * 10, "─" * 10, "─" * 10, "─" * 10, "─" * 8, style="dim")
+    
+    # Add totals row
+    table.add_row(
+        f"[bold cyan]TOTALS ({displayed_count} devs)[/bold cyan]",
+        f"[bold]{bucket_totals['10am-12pm']}[/bold]",
+        f"[bold]{bucket_totals['12pm-2pm']}[/bold]",
+        f"[bold]{bucket_totals['2pm-4pm']}[/bold]",
+        f"[bold]{bucket_totals['4pm-6pm']}[/bold]",
+        f"[bold yellow]{bucket_totals['off_hours']}[/bold yellow]",
+        f"[bold green]{total_activity}[/bold green]"
+    )
+    
+    # Display table
+    console.print(table)
+    
+    # Display legend
+    console.print("\n[bold]Legend:[/bold] [dim](J=Jira, R=Repo)[/dim]")
+    console.print("[bold green]■[/bold green] High (10+)  [green]■[/green] Medium (5-9)  [yellow]■[/yellow] Low (3-4)  [white]■[/white] Minimal (1-2)")
+    
+    # Display summary statistics
+    if summary:
+        console.print("\n[bold cyan]Summary Statistics:[/bold cyan]")
+        console.print(f"  Total Developers: {summary.get('total_developers', 'N/A')}")
+        console.print(f"  Total Activity: {summary.get('total_activity', total_activity)}")
+        console.print(f"  - Jira Actions: {summary.get('total_jira_actions', total_jira)}")
+        console.print(f"  - Repo Actions: {summary.get('total_repo_actions', total_repo)}")
+        console.print(f"  Most Active Bucket: [bold]{summary.get('most_active_bucket', 'N/A')}[/bold]")
+        console.print(f"  Off-Hours Activity: {summary.get('off_hours_activity', 0)} ({summary.get('off_hours_percentage', 0)}%)")
+    else:
+        console.print("\n[bold cyan]Summary Statistics:[/bold cyan]")
+        console.print(f"  Displayed Developers: {displayed_count}")
+        console.print(f"  Total Activity: {total_activity}")
+        console.print(f"  - Jira Actions: {total_jira}")
+        console.print(f"  - Repo Actions: {total_repo}")
+    
+    if displayed_count < len(developers_list):
+        remaining = len(developers_list) - displayed_count
+        console.print(f"\n[dim]Note: {remaining} developers with no activity not shown[/dim]")
+    
+    console.print("\n[bold cyan]═══════════════════════════════════════════════════════════════════════[/bold cyan]\n")

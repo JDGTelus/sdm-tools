@@ -14,6 +14,7 @@ from .database import (
     display_existing_sprint_stats,
     generate_developer_activity_json,
     generate_daily_report_json,
+    display_daily_report_summary,
 )
 from .config import DB_NAME, TABLE_NAME
 
@@ -345,8 +346,10 @@ def handle_daily_report_option():
                     )
                 else:
                     console.print(
-                        f"[bold green]Daily report generated successfully at: {json_filename}[/bold green]"
+                        f"[bold green]Daily report generated successfully![/bold green]"
                     )
+                    # Display the report
+                    display_daily_report_summary(json_file=json_filename)
                 input("Press Enter to return to the menu...")
             except Exception as e:
                 console.print(
@@ -357,13 +360,12 @@ def handle_daily_report_option():
                 input("Press Enter to return to the menu...")
         else:
             # User wants to just display existing data
-            console.print(
-                f"[bold green]Daily report file exists at: {daily_report_file}[/bold green]"
-            )
-            console.print(
-                "[bold yellow]Use option 6 to generate HTML dashboard from this data.[/bold yellow]"
-            )
-            input("Press Enter to return to the menu...")
+            try:
+                display_daily_report_summary(json_file=daily_report_file)
+                input("Press Enter to return to the menu...")
+            except Exception as e:
+                console.print(f"[bold red]Error displaying report: {str(e)}[/bold red]")
+                input("Press Enter to return to the menu...")
     else:
         # No data exists, generate it
         console.print(
@@ -377,8 +379,10 @@ def handle_daily_report_option():
                 )
             else:
                 console.print(
-                    f"[bold green]Daily report generated successfully at: {json_filename}[/bold green]"
+                    f"[bold green]Daily report generated successfully![/bold green]"
                 )
+                # Display the report
+                display_daily_report_summary(json_file=json_filename)
             input("Press Enter to return to the menu...")
         except Exception as e:
             console.print(

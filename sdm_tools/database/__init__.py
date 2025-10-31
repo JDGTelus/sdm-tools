@@ -13,6 +13,7 @@ from .stats import (
     display_existing_sprint_stats,
     generate_developer_activity_json,
     generate_daily_report_json,
+    display_daily_report_summary,
 )
 from .sprints import process_sprints_from_issues, display_sprints_table
 
@@ -30,6 +31,7 @@ __all__ = [
     "display_existing_sprint_stats",
     "generate_developer_activity_json",
     "generate_daily_report_json",
+    "display_daily_report_summary",
     "process_sprints_from_issues",
     "display_sprints_table",
 ]
