@@ -2278,6 +2278,13 @@ def generate_daily_report_json(target_date=None, output_file=None):
     elif isinstance(target_date, datetime):
         target_date = target_date.date()
     
+    # Validate date is not in the future
+    today = datetime.now(tz).date()
+    if target_date > today:
+        console.print(f"[bold red]Error: Cannot generate report for future date {target_date}[/bold red]")
+        console.print(f"[bold yellow]Today is {today}. Please select today or an earlier date.[/bold yellow]")
+        return None
+    
     console.print(f"\n[bold cyan]Generating Daily Activity Report for {target_date}[/bold cyan]")
     
     # Collect activity data
