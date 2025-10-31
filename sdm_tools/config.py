@@ -13,6 +13,6 @@ TABLE_NAME = os.getenv("TABLE_NAME", "iotmi_3p_issues")
 REPO_PATH = os.getenv("REPO_PATH")
 SIMPLE_STATS = os.getenv("SIMPLE_STATS", "ux/web/data/team_simple_stats.json")
 BASIC_STATS = os.getenv("BASIC_STATS", "ux/web/data/team_basic_stats.json")
-EXCLUDED_EMAILS = (
-    os.getenv("EXCLUDED_EMAILS", "").split(",") if os.getenv("EXCLUDED_EMAILS") else []
+INCLUDED_EMAILS = (
+    os.getenv("INCLUDED_EMAILS", "").split(",") if os.getenv("INCLUDED_EMAILS") else []
 )

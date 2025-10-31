@@ -8,7 +8,7 @@ from datetime import datetime
 from collections import defaultdict
 from rich.console import Console
 from rich.table import Table
-from ..config import DB_NAME, TABLE_NAME, BASIC_STATS, EXCLUDED_EMAILS
+from ..config import DB_NAME, TABLE_NAME, BASIC_STATS, INCLUDED_EMAILS
 
 console = Console()
 
@@ -94,16 +94,20 @@ def extract_developer_info(assignee_json_str):
         return assignee_json_str, "Unknown"
 
 
-def should_exclude_email(email):
-    """Check if an email should be excluded from the output."""
+def should_include_email(email):
+    """Check if an email should be included in the output."""
     if not email or email == "Unknown":
         return False
 
-    # Clean up the excluded emails list (remove empty strings and whitespace)
-    excluded_emails = [e.strip().lower() for e in EXCLUDED_EMAILS if e.strip()]
+    # If no INCLUDED_EMAILS specified, include all (for backward compatibility)
+    if not INCLUDED_EMAILS:
+        return True
 
-    # Check if the email matches any excluded email (case-insensitive)
-    return email.lower() in excluded_emails
+    # Clean up the included emails list (remove empty strings and whitespace)
+    included_emails = [e.strip().lower() for e in INCLUDED_EMAILS if e.strip()]
+
+    # Check if the email matches any included email (case-insensitive)
+    return email.lower() in included_emails
 
 
 def get_jira_stats_for_assignee(cursor, assignee):
@@ -888,11 +892,11 @@ def generate_sprint_stats_json():
         )
         assignees = [row[0] for row in cursor.fetchall()]
 
-        # Filter out excluded emails
+        # Filter to include only specified emails
         filtered_assignees = []
         for assignee in assignees:
             _, email = extract_developer_info(assignee)
-            if not should_exclude_email(email):
+            if should_include_email(email):
                 filtered_assignees.append(assignee)
 
         if not filtered_assignees:
@@ -1349,7 +1353,7 @@ def get_last_3_days_activity(cursor):
     cutoff_date = datetime.now() - timedelta(days=3)
     cutoff_str = cutoff_date.isoformat()
 
-    # Get valid team members (assignees from Jira, filtered by excluded emails)
+    # Get valid team members (assignees from Jira, filtered to include only specified emails)
     cursor.execute(
         f"""
         SELECT DISTINCT assignee
@@ -1359,12 +1363,12 @@ def get_last_3_days_activity(cursor):
     )
     assignees = [row[0] for row in cursor.fetchall()]
 
-    # Filter out excluded emails and build valid email set
+    # Filter to include only specified emails and build valid email set
     valid_emails = set()
     valid_assignees = {}
     for assignee in assignees:
         name, email = extract_developer_info(assignee)
-        if not should_exclude_email(email):
+        if should_include_email(email):
             valid_emails.add(email.lower())
             valid_assignees[email.lower()] = (name, email)
 
@@ -1514,7 +1518,7 @@ def get_sprint_activity(
     except:
         return None
 
-    # Get valid team members (assignees from Jira, filtered by excluded emails)
+    # Get valid team members (assignees from Jira, filtered to include only specified emails)
     cursor.execute(
         f"""
         SELECT DISTINCT assignee
@@ -1524,12 +1528,12 @@ def get_sprint_activity(
     )
     assignees = [row[0] for row in cursor.fetchall()]
 
-    # Filter out excluded emails and build valid email set
+    # Filter to include only specified emails and build valid email set
     valid_emails = set()
     valid_assignees = {}
     for assignee in assignees:
         name, email = extract_developer_info(assignee)
-        if not should_exclude_email(email):
+        if should_include_email(email):
             valid_emails.add(email.lower())
             valid_assignees[email.lower()] = (name, email)
 
