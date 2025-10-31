@@ -4,11 +4,20 @@ import os
 import sqlite3
 import json
 import shutil
-from datetime import datetime
+from datetime import datetime, date
 from collections import defaultdict
 from rich.console import Console
 from rich.table import Table
-from ..config import DB_NAME, TABLE_NAME, BASIC_STATS, INCLUDED_EMAILS
+from ..config import DB_NAME, TABLE_NAME, BASIC_STATS, INCLUDED_EMAILS, TIMEZONE
+from ..utils import (
+    parse_git_date_to_local,
+    parse_jira_date_to_local,
+    get_time_bucket,
+    get_date_start_end,
+    get_all_time_buckets,
+    is_off_hours,
+    get_local_timezone
+)
 
 console = Console()
 
@@ -1957,3 +1966,272 @@ def display_developer_activity_summary(last_3_days, sprint_activity):
         console.print(
             f"  Avg Activity per Developer: {summary['avg_activity_per_developer']}"
         )
+
+
+# ============================================================================
+# Daily Activity Report Functions
+# ============================================================================
+
+def get_daily_activity_by_buckets(target_date=None, tz=None):
+    """Get developer activity by time buckets for a specific date.
+    
+    Time buckets:
+        - "10am-12pm": 10:00-11:59
+        - "12pm-2pm": 12:00-13:59
+        - "2pm-4pm": 14:00-15:59
+        - "4pm-6pm": 16:00-17:59
+        - "off_hours": 18:00 previous day to 07:59 current day
+    
+    Args:
+        target_date: date object or datetime object. If None, uses today.
+        tz: Timezone string or ZoneInfo. If None, uses config TIMEZONE.
+    
+    Returns:
+        Dict of developer email -> activity data with time buckets
+    """
+    if not os.path.exists(DB_NAME):
+        console.print("[bold red]Database does not exist.[/bold red]")
+        return {}
+    
+    # Get timezone
+    if tz is None:
+        tz = get_local_timezone()
+    elif isinstance(tz, str):
+        tz = get_local_timezone(tz)
+    
+    # Get target date
+    if target_date is None:
+        target_date = datetime.now(tz).date()
+    elif isinstance(target_date, datetime):
+        target_date = target_date.date()
+    
+    # Get date boundaries in local timezone
+    date_start, date_end = get_date_start_end(target_date, tz)
+    
+    console.print(f"[bold cyan]Collecting daily activity for {target_date} ({tz})...[/bold cyan]")
+    
+    with sqlite3.connect(DB_NAME) as conn:
+        cursor = conn.cursor()
+        
+        # Initialize developer activity dict
+        developer_activity = {}
+        
+        # Get list of included developers
+        cursor.execute(
+            f"""
+            SELECT DISTINCT assignee
+            FROM {TABLE_NAME}
+            WHERE assignee IS NOT NULL AND assignee != '' AND assignee != 'null'
+        """
+        )
+        assignees = [row[0] for row in cursor.fetchall()]
+        
+        # Filter to included emails only
+        included_devs = {}
+        for assignee in assignees:
+            name, email = extract_developer_info(assignee)
+            if should_include_email(email):
+                included_devs[email.lower()] = (name, email)
+                # Initialize developer in activity dict
+                developer_activity[email.lower()] = {
+                    "name": name,
+                    "email": email,
+                    "buckets": {
+                        "10am-12pm": {"jira": 0, "repo": 0, "total": 0},
+                        "12pm-2pm": {"jira": 0, "repo": 0, "total": 0},
+                        "2pm-4pm": {"jira": 0, "repo": 0, "total": 0},
+                        "4pm-6pm": {"jira": 0, "repo": 0, "total": 0},
+                    },
+                    "off_hours": {"jira": 0, "repo": 0, "total": 0},
+                    "daily_total": {"jira": 0, "repo": 0, "total": 0}
+                }
+        
+        if not included_devs:
+            console.print("[bold yellow]No developers in INCLUDED_EMAILS list.[/bold yellow]")
+            return {}
+        
+        console.print(f"[bold green]Tracking {len(included_devs)} developers[/bold green]")
+        
+        # ===== COLLECT GIT COMMIT ACTIVITY =====
+        # Check if git_commits table exists
+        cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='git_commits'")
+        if cursor.fetchone():
+            cursor.execute("SELECT author_email, author_name, date FROM git_commits")
+            commits = cursor.fetchall()
+            
+            for author_email, author_name, commit_date_str in commits:
+                if not author_email:
+                    continue
+                
+                email_lower = author_email.lower()
+                
+                # Only process included developers
+                if email_lower not in included_devs:
+                    continue
+                
+                # Parse git date to local timezone
+                local_dt = parse_git_date_to_local(commit_date_str, tz)
+                if not local_dt:
+                    continue
+                
+                # Check if commit is within target date
+                if not (date_start <= local_dt <= date_end):
+                    continue
+                
+                # Determine time bucket
+                bucket = get_time_bucket(local_dt)
+                
+                # Add to appropriate bucket
+                if bucket == "off_hours":
+                    developer_activity[email_lower]["off_hours"]["repo"] += 1
+                    developer_activity[email_lower]["off_hours"]["total"] += 1
+                elif bucket:  # Regular bucket (10am-12pm, etc.)
+                    developer_activity[email_lower]["buckets"][bucket]["repo"] += 1
+                    developer_activity[email_lower]["buckets"][bucket]["total"] += 1
+                
+                # Add to daily total
+                developer_activity[email_lower]["daily_total"]["repo"] += 1
+                developer_activity[email_lower]["daily_total"]["total"] += 1
+        
+        # ===== COLLECT JIRA ACTIVITY =====
+        # Get table columns
+        cursor.execute(f"PRAGMA table_info({TABLE_NAME})")
+        columns = [info[1] for info in cursor.fetchall()]
+        
+        # Track Jira created events
+        if "creator" in columns and "created" in columns:
+            cursor.execute(
+                f"""
+                SELECT creator, created
+                FROM {TABLE_NAME}
+                WHERE creator IS NOT NULL AND created IS NOT NULL
+            """
+            )
+            
+            for creator, created_str in cursor.fetchall():
+                if not creator:
+                    continue
+                
+                _, email = extract_developer_info(creator)
+                email_lower = email.lower()
+                
+                # Only process included developers
+                if email_lower not in included_devs:
+                    continue
+                
+                # Parse Jira date to local timezone
+                local_dt = parse_jira_date_to_local(created_str, tz)
+                if not local_dt:
+                    continue
+                
+                # Check if event is within target date
+                if not (date_start <= local_dt <= date_end):
+                    continue
+                
+                # Determine time bucket
+                bucket = get_time_bucket(local_dt)
+                
+                # Add to appropriate bucket
+                if bucket == "off_hours":
+                    developer_activity[email_lower]["off_hours"]["jira"] += 1
+                    developer_activity[email_lower]["off_hours"]["total"] += 1
+                elif bucket:
+                    developer_activity[email_lower]["buckets"][bucket]["jira"] += 1
+                    developer_activity[email_lower]["buckets"][bucket]["total"] += 1
+                
+                # Add to daily total
+                developer_activity[email_lower]["daily_total"]["jira"] += 1
+                developer_activity[email_lower]["daily_total"]["total"] += 1
+        
+        # Track Jira updated events
+        if "assignee" in columns and "updated" in columns:
+            cursor.execute(
+                f"""
+                SELECT assignee, updated
+                FROM {TABLE_NAME}
+                WHERE assignee IS NOT NULL AND updated IS NOT NULL
+            """
+            )
+            
+            for assignee, updated_str in cursor.fetchall():
+                if not assignee:
+                    continue
+                
+                _, email = extract_developer_info(assignee)
+                email_lower = email.lower()
+                
+                # Only process included developers
+                if email_lower not in included_devs:
+                    continue
+                
+                # Parse Jira date to local timezone
+                local_dt = parse_jira_date_to_local(updated_str, tz)
+                if not local_dt:
+                    continue
+                
+                # Check if event is within target date
+                if not (date_start <= local_dt <= date_end):
+                    continue
+                
+                # Determine time bucket
+                bucket = get_time_bucket(local_dt)
+                
+                # Add to appropriate bucket
+                if bucket == "off_hours":
+                    developer_activity[email_lower]["off_hours"]["jira"] += 1
+                    developer_activity[email_lower]["off_hours"]["total"] += 1
+                elif bucket:
+                    developer_activity[email_lower]["buckets"][bucket]["jira"] += 1
+                    developer_activity[email_lower]["buckets"][bucket]["total"] += 1
+                
+                # Add to daily total
+                developer_activity[email_lower]["daily_total"]["jira"] += 1
+                developer_activity[email_lower]["daily_total"]["total"] += 1
+        
+        # Track Jira status change events
+        if "assignee" in columns and "statuscategorychangedate" in columns:
+            cursor.execute(
+                f"""
+                SELECT assignee, statuscategorychangedate
+                FROM {TABLE_NAME}
+                WHERE assignee IS NOT NULL AND statuscategorychangedate IS NOT NULL
+            """
+            )
+            
+            for assignee, status_date_str in cursor.fetchall():
+                if not assignee:
+                    continue
+                
+                _, email = extract_developer_info(assignee)
+                email_lower = email.lower()
+                
+                # Only process included developers
+                if email_lower not in included_devs:
+                    continue
+                
+                # Parse Jira date to local timezone
+                local_dt = parse_jira_date_to_local(status_date_str, tz)
+                if not local_dt:
+                    continue
+                
+                # Check if event is within target date
+                if not (date_start <= local_dt <= date_end):
+                    continue
+                
+                # Determine time bucket
+                bucket = get_time_bucket(local_dt)
+                
+                # Add to appropriate bucket
+                if bucket == "off_hours":
+                    developer_activity[email_lower]["off_hours"]["jira"] += 1
+                    developer_activity[email_lower]["off_hours"]["total"] += 1
+                elif bucket:
+                    developer_activity[email_lower]["buckets"][bucket]["jira"] += 1
+                    developer_activity[email_lower]["buckets"][bucket]["total"] += 1
+                
+                # Add to daily total
+                developer_activity[email_lower]["daily_total"]["jira"] += 1
+                developer_activity[email_lower]["daily_total"]["total"] += 1
+    
+    console.print(f"[bold green]Daily activity collection complete![/bold green]")
+    return developer_activity
