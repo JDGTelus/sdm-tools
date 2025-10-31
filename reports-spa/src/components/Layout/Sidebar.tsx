@@ -10,7 +10,8 @@ const menuItems: MenuItem[] = [
   { path: '/', label: 'Team Sprint Dashboard', icon: '📊' },
   { path: '/kpi', label: 'Team KPI Dashboard', icon: '📈' },
   { path: '/activity', label: 'Developer Activity', icon: '👥' },
-  { path: '/comparison', label: 'Developer Comparison', icon: '⚖️' }
+  { path: '/comparison', label: 'Developer Comparison', icon: '⚖️' },
+  { path: '/daily', label: 'Daily Activity Report', icon: '📅' }
 ]
 
 interface SidebarProps {

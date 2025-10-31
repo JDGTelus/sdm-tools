@@ -27,12 +27,26 @@ export function getActivityData(): DeveloperActivityData | null {
 }
 
 /**
+ * Access embedded daily activity data from window globals
+ * Data is injected at build time via Vite plugin
+ */
+export function getDailyActivityData(): any | null {
+  if (typeof window !== 'undefined' && window.__DAILY_ACTIVITY_DATA__) {
+    return window.__DAILY_ACTIVITY_DATA__
+  }
+  
+  console.warn('Daily activity data not found. Data should be embedded at build time.')
+  return null
+}
+
+/**
  * Get all embedded data at once
  */
 export function getAllData() {
   return {
     sprintData: getSprintData(),
     activityData: getActivityData(),
+    dailyActivityData: getDailyActivityData(),
   }
 }
 

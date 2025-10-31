@@ -4,6 +4,7 @@ import TeamSprintDashboard from '@/pages/TeamSprintDashboard'
 import TeamKpiDashboard from '@/pages/TeamKpiDashboard'
 import DeveloperActivityDashboard from '@/pages/DeveloperActivityDashboard'
 import DeveloperComparisonDashboard from '@/pages/DeveloperComparisonDashboard'
+import DailyActivityDashboard from '@/pages/DailyActivityDashboard'
 
 function App() {
   return (
@@ -14,6 +15,7 @@ function App() {
           <Route path="/kpi" element={<TeamKpiDashboard />} />
           <Route path="/activity" element={<DeveloperActivityDashboard />} />
           <Route path="/comparison" element={<DeveloperComparisonDashboard />} />
+          <Route path="/daily" element={<DailyActivityDashboard />} />
         </Routes>
       </Layout>
     </Router>
