@@ -2235,3 +2235,132 @@ def get_daily_activity_by_buckets(target_date=None, tz=None):
     
     console.print(f"[bold green]Daily activity collection complete![/bold green]")
     return developer_activity
+
+
+def backup_daily_report_file(file_path):
+    """Backup existing daily report file if it exists."""
+    if os.path.exists(file_path):
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        directory = os.path.dirname(file_path)
+        filename = os.path.basename(file_path)
+        name, ext = os.path.splitext(filename)
+        backup_path = os.path.join(directory, f"{name}_backup_{timestamp}{ext}")
+        
+        shutil.copy2(file_path, backup_path)
+        console.print(f"[bold yellow]Backup created: {backup_path}[/bold yellow]")
+        return backup_path
+    return None
+
+
+def generate_daily_report_json(target_date=None, output_file=None):
+    """Generate daily activity report JSON file.
+    
+    Args:
+        target_date: date object or datetime. If None, uses today.
+        output_file: Path to output JSON file. If None, uses default location.
+    
+    Returns:
+        Path to generated JSON file, or None if failed
+    """
+    # Default output file
+    if output_file is None:
+        output_file = "ux/web/data/daily_activity_report.json"
+    
+    # Ensure directory exists
+    os.makedirs(os.path.dirname(output_file), exist_ok=True)
+    
+    # Get timezone
+    tz = get_local_timezone()
+    
+    # Get target date
+    if target_date is None:
+        target_date = datetime.now(tz).date()
+    elif isinstance(target_date, datetime):
+        target_date = target_date.date()
+    
+    console.print(f"\n[bold cyan]Generating Daily Activity Report for {target_date}[/bold cyan]")
+    
+    # Collect activity data
+    daily_activity = get_daily_activity_by_buckets(target_date, tz)
+    
+    if not daily_activity:
+        console.print("[bold red]No activity data collected. Aborting report generation.[/bold red]")
+        return None
+    
+    # Convert to list format for JSON
+    developers_list = []
+    for email, data in daily_activity.items():
+        developers_list.append(data)
+    
+    # Sort by total activity (descending)
+    developers_list.sort(key=lambda d: d['daily_total']['total'], reverse=True)
+    
+    # Calculate summary statistics
+    total_developers = len(developers_list)
+    total_activity = sum(d['daily_total']['total'] for d in developers_list)
+    total_jira = sum(d['daily_total']['jira'] for d in developers_list)
+    total_repo = sum(d['daily_total']['repo'] for d in developers_list)
+    
+    # Find most active bucket
+    bucket_totals = {}
+    for bucket in get_all_time_buckets():
+        if bucket == "off_hours":
+            bucket_totals[bucket] = sum(d['off_hours']['total'] for d in developers_list)
+        else:
+            bucket_totals[bucket] = sum(d['buckets'][bucket]['total'] for d in developers_list)
+    
+    most_active_bucket = max(bucket_totals.items(), key=lambda x: x[1])[0] if bucket_totals else "N/A"
+    
+    # Calculate off-hours percentage
+    off_hours_total = bucket_totals.get('off_hours', 0)
+    off_hours_percentage = round((off_hours_total / total_activity * 100), 1) if total_activity > 0 else 0
+    
+    # Build JSON structure
+    report_data = {
+        "generated_at": datetime.now(tz).isoformat(),
+        "metadata": {
+            "report_date": str(target_date),
+            "timezone": str(tz),
+            "time_buckets": ["10am-12pm", "12pm-2pm", "2pm-4pm", "4pm-6pm"],
+            "off_hours_window": "6pm previous day to 8am current day"
+        },
+        "developers": developers_list,
+        "summary": {
+            "total_developers": total_developers,
+            "total_activity": total_activity,
+            "total_jira_actions": total_jira,
+            "total_repo_actions": total_repo,
+            "most_active_bucket": most_active_bucket,
+            "off_hours_activity": off_hours_total,
+            "off_hours_percentage": off_hours_percentage,
+            "bucket_totals": bucket_totals
+        }
+    }
+    
+    # Backup existing file
+    backup_daily_report_file(output_file)
+    
+    # Write JSON file
+    try:
+        with open(output_file, 'w') as f:
+            json.dump(report_data, f, indent=2)
+        
+        console.print(f"\n[bold green]Daily report generated successfully![/bold green]")
+        console.print(f"[bold green]Output: {output_file}[/bold green]")
+        
+        # Display summary
+        console.print(f"\n[bold cyan]Report Summary:[/bold cyan]")
+        console.print(f"  Date: {target_date}")
+        console.print(f"  Timezone: {tz}")
+        console.print(f"  Total Developers: {total_developers}")
+        console.print(f"  Total Activity: {total_activity}")
+        console.print(f"  - Jira Actions: {total_jira}")
+        console.print(f"  - Repo Actions: {total_repo}")
+        console.print(f"  Most Active Bucket: {most_active_bucket} ({bucket_totals.get(most_active_bucket, 0)} actions)")
+        console.print(f"  Off-Hours Activity: {off_hours_total} ({off_hours_percentage}%)")
+        
+        return output_file
+        
+    except Exception as e:
+        console.print(f"[bold red]Error writing JSON file: {e}[/bold red]")
+        return None

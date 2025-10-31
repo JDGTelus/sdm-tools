@@ -13,6 +13,7 @@ from .database import (
     generate_sprint_stats_json,
     display_existing_sprint_stats,
     generate_developer_activity_json,
+    generate_daily_report_json,
 )
 from .config import DB_NAME, TABLE_NAME
 
@@ -295,6 +296,95 @@ def handle_developer_activity_option():
             )
             import traceback
 
+            traceback.print_exc()
+            input("Press Enter to return to the menu...")
+
+
+def handle_daily_report_option():
+    """Handle the daily activity report option (generate JSON with activity by time buckets)."""
+    from datetime import datetime, date
+    
+    daily_report_file = "ux/web/data/daily_activity_report.json"
+    
+    # Ask user for target date
+    console.print("\n[bold yellow]Daily Activity Report[/bold yellow]")
+    console.print("[bold cyan]Enter target date (YYYY-MM-DD) or press Enter for today:[/bold cyan]")
+    date_input = console.input("[bold green]Date: [/bold green]").strip()
+    
+    target_date = None
+    if date_input:
+        try:
+            target_date = datetime.strptime(date_input, "%Y-%m-%d").date()
+            console.print(f"[bold green]Generating report for: {target_date}[/bold green]")
+        except ValueError:
+            console.print("[bold red]Invalid date format. Using today instead.[/bold red]")
+            target_date = None
+    
+    if target_date is None:
+        target_date = datetime.now().date()
+        console.print(f"[bold green]Generating report for today: {target_date}[/bold green]")
+    
+    # Check if report file already exists
+    if os.path.exists(daily_report_file):
+        # Data exists, ask if user wants to update
+        update_choice = (
+            console.input(
+                "[bold yellow]Daily report file already exists. Do you want to regenerate it? (y/N): [/bold yellow]"
+            )
+            .strip()
+            .lower()
+        )
+
+        if update_choice == "y" or update_choice == "yes":
+            # User wants to regenerate
+            try:
+                json_filename = generate_daily_report_json(target_date)
+                if not json_filename:
+                    console.print(
+                        "[bold red]Failed to generate daily report.[/bold red]"
+                    )
+                else:
+                    console.print(
+                        f"[bold green]Daily report generated successfully at: {json_filename}[/bold green]"
+                    )
+                input("Press Enter to return to the menu...")
+            except Exception as e:
+                console.print(
+                    f"[bold red]Error generating daily report: {str(e)}[/bold red]"
+                )
+                import traceback
+                traceback.print_exc()
+                input("Press Enter to return to the menu...")
+        else:
+            # User wants to just display existing data
+            console.print(
+                f"[bold green]Daily report file exists at: {daily_report_file}[/bold green]"
+            )
+            console.print(
+                "[bold yellow]Use option 6 to generate HTML dashboard from this data.[/bold yellow]"
+            )
+            input("Press Enter to return to the menu...")
+    else:
+        # No data exists, generate it
+        console.print(
+            "[bold yellow]No daily report file found. Generating from database...[/bold yellow]"
+        )
+        try:
+            json_filename = generate_daily_report_json(target_date)
+            if not json_filename:
+                console.print(
+                    "[bold red]Failed to generate daily report.[/bold red]"
+                )
+            else:
+                console.print(
+                    f"[bold green]Daily report generated successfully at: {json_filename}[/bold green]"
+                )
+            input("Press Enter to return to the menu...")
+        except Exception as e:
+            console.print(
+                f"[bold red]Error generating daily report: {str(e)}[/bold red]"
+            )
+            import traceback
             traceback.print_exc()
             input("Press Enter to return to the menu...")
 
@@ -812,12 +902,15 @@ def manage_issues():
             "[bold cyan]4. Developer activity JSON (update/display)[/bold cyan]"
         )
         console.print(
-            "[bold cyan]5. Generate self-sufficient HTML dashboard[/bold cyan]"
+            "[bold cyan]5. Daily activity report JSON (generate/display)[/bold cyan]"
         )
-        console.print("[bold cyan]6. Exit[/bold cyan]")
+        console.print(
+            "[bold cyan]6. Generate self-sufficient HTML dashboard[/bold cyan]"
+        )
+        console.print("[bold cyan]7. Exit[/bold cyan]")
 
         choice = console.input(
-            "[bold green]Enter your choice (1/2/3/4/5/6): [/bold green]"
+            "[bold green]Enter your choice (1/2/3/4/5/6/7): [/bold green]"
         )
 
         if choice == "1":
@@ -829,8 +922,10 @@ def manage_issues():
         elif choice == "4":
             handle_developer_activity_option()
         elif choice == "5":
-            handle_html_generation_option()
+            handle_daily_report_option()
         elif choice == "6":
+            handle_html_generation_option()
+        elif choice == "7":
             console.print("[bold red]Exiting SDM Tools.[/bold red]")
             break
         else:
