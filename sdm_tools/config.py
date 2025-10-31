@@ -16,3 +16,4 @@ BASIC_STATS = os.getenv("BASIC_STATS", "ux/web/data/team_basic_stats.json")
 INCLUDED_EMAILS = (
     os.getenv("INCLUDED_EMAILS", "").split(",") if os.getenv("INCLUDED_EMAILS") else []
 )
+TIMEZONE = os.getenv("TIMEZONE", "America/Mexico_City")  # GMT-6
