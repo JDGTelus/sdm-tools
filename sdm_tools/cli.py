@@ -673,7 +673,9 @@ def generate_legacy_html():
 
                 # Determine which JSON file to use based on HTML filename
                 json_file = None
-                if "comparison" in filename.lower():
+                if "daily" in filename.lower():
+                    json_file = "ux/web/data/daily_activity_report.json"
+                elif "comparison" in filename.lower():
                     # Comparison dashboard needs both files
                     json_file = "ux/web/data/team_sprint_stats.json"
                 elif "activity" in filename.lower():
