@@ -509,122 +509,6 @@ def generate_vite_spa():
         return False
 
 
-def generate_vite_spa():
-    """Generate the Vite SPA bundle with embedded data."""
-    import shutil
-    import subprocess
-
-    console.print("[bold yellow]Generating Vite SPA bundle...[/bold yellow]")
-
-    try:
-        # Check if required JSON files exist
-        sprint_stats_file = "ux/web/data/team_sprint_stats.json"
-        activity_file = "ux/web/data/developer_activity.json"
-
-        if not os.path.exists(sprint_stats_file):
-            console.print(
-                f"[bold red]Sprint stats file not found at {sprint_stats_file}.[/bold red]"
-            )
-            console.print(
-                "[bold yellow]Please generate sprint analytics first (option 3).[/bold yellow]"
-            )
-            input("Press Enter to return to the menu...")
-            return False
-
-        if not os.path.exists(activity_file):
-            console.print(
-                f"[bold red]Developer activity file not found at {activity_file}.[/bold red]"
-            )
-            console.print(
-                "[bold yellow]Please generate developer activity first (option 4).[/bold yellow]"
-            )
-            input("Press Enter to return to the menu...")
-            return False
-
-        # Save current directory
-        original_cwd = os.getcwd()
-
-        try:
-            # Change to reports-spa directory
-            spa_dir = "reports-spa"
-            if not os.path.exists(spa_dir):
-                console.print(
-                    f"[bold red]Vite SPA directory not found at {spa_dir}.[/bold red]"
-                )
-                input("Press Enter to return to the menu...")
-                return False
-
-            os.chdir(spa_dir)
-
-            # Run the build
-            console.print(
-                "[bold cyan]Building Vite SPA (this may take a moment)...[/bold cyan]"
-            )
-            result = subprocess.run(
-                ["npm", "run", "build"], capture_output=True, text=True
-            )
-
-            if result.returncode != 0:
-                console.print(f"[bold red]Build failed with error:[/bold red]")
-                console.print(result.stderr)
-                input("Press Enter to return to the menu...")
-                return False
-
-            # Return to original directory
-            os.chdir(original_cwd)
-
-            # Check if build output exists
-            dist_dir = "dist/reports"
-            source_html = os.path.join(dist_dir, "index.html")
-            
-            if os.path.exists(source_html):
-                # Get file size for display
-                file_size = os.path.getsize(source_html)
-                size_mb = file_size / (1024 * 1024)
-                size_kb = file_size / 1024
-                
-                if size_mb >= 1:
-                    size_str = f"{size_mb:.2f} MB"
-                else:
-                    size_str = f"{size_kb:.2f} KB"
-                
-                console.print(
-                    "[bold green]✓ Single-file SPA bundle generated successfully![/bold green]"
-                )
-                console.print(f"[bold cyan]Output: {source_html}[/bold cyan]")
-                console.print(f"[bold cyan]Size: {size_str} (single self-contained HTML file)[/bold cyan]")
-                console.print(
-                    "[bold yellow]This file contains:[/bold yellow]"
-                )
-                console.print("[bold yellow]  • All 4 dashboards with navigation[/bold yellow]")
-                console.print("[bold yellow]  • Embedded data (no external files needed)[/bold yellow]")
-                console.print("[bold yellow]  • Inlined JavaScript and CSS[/bold yellow]")
-                console.print("[bold yellow]  • Works completely offline[/bold yellow]")
-                console.print(
-                    f"\n[bold green]Open {source_html} in any browser to view.[/bold green]"
-                )
-                return True
-            else:
-                console.print(
-                    "[bold red]Build completed but index.html not found.[/bold red]"
-                )
-                return False
-
-        finally:
-            # Always restore original directory
-            os.chdir(original_cwd)
-
-    except subprocess.CalledProcessError as e:
-        console.print(f"[bold red]Error running build command: {str(e)}[/bold red]")
-        return False
-    except Exception as e:
-        console.print(f"[bold red]Error generating Vite SPA: {str(e)}[/bold red]")
-        import traceback
-
-        traceback.print_exc()
-        return False
-
-
 def generate_legacy_html():
     """Generate legacy standalone HTML dashboards (deprecated)."""
     import json
@@ -720,6 +604,11 @@ def generate_legacy_html():
 
                 # Replace the CSS import with inline styles
                 inline_css = f"<style>\n{css_content}\n</style>"
+                # Replace CSS link (handle both self-closing and regular tags)
+                html_content = html_content.replace(
+                    '<link rel="stylesheet" href="shared-dashboard-styles.css" />',
+                    inline_css,
+                )
                 html_content = html_content.replace(
                     '<link rel="stylesheet" href="shared-dashboard-styles.css">',
                     inline_css,
@@ -773,10 +662,16 @@ def generate_legacy_html():
                     # Original single-file fetch logic
                     fetch_pattern_1 = "fetch('./data/"
                     fetch_pattern_2 = "fetch('data/"
+                    fetch_pattern_3 = 'fetch("./data/'
+                    fetch_pattern_4 = 'fetch("data/'
                     fetch_start = html_content.find(fetch_pattern_1)
 
                     if fetch_start == -1:
                         fetch_start = html_content.find(fetch_pattern_2)
+                    if fetch_start == -1:
+                        fetch_start = html_content.find(fetch_pattern_3)
+                    if fetch_start == -1:
+                        fetch_start = html_content.find(fetch_pattern_4)
 
                     if fetch_start != -1:
                         useEffect_start = html_content.rfind(
