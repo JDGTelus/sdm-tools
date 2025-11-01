@@ -2429,13 +2429,13 @@ def display_daily_report_summary(daily_activity_data=None, json_file=None):
     table = Table(show_header=True, header_style="bold cyan", title="Activity by Time Bucket", 
                   title_style="bold magenta", border_style="cyan")
     
-    # Add columns
+    # Add columns (cutoff times - max of each bucket)
     table.add_column("Developer", style="bold white", width=25)
-    table.add_column("8am", justify="center", width=12)
     table.add_column("10am", justify="center", width=12)
     table.add_column("12pm", justify="center", width=12)
     table.add_column("2pm", justify="center", width=12)
     table.add_column("4pm", justify="center", width=12)
+    table.add_column("6pm", justify="center", width=12)
     table.add_column("Off-Hours", justify="center", width=12, style="yellow")
     table.add_column("Total", justify="center", width=10, style="bold green")
     
