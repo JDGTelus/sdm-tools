@@ -289,7 +289,6 @@ export default function DailyActivityDashboard() {
             labels={developerComparisonData.labels}
             datasets={developerComparisonData.datasets}
             title="Ranking - Jira vs Repo Activity"
-            horizontal={true}
           />
         </div>
 
