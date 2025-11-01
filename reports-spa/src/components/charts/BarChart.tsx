@@ -34,6 +34,7 @@ interface BarChartProps {
   title?: string
   className?: string
   horizontal?: boolean
+  stacked?: boolean
 }
 
 export default function BarChart({ 
@@ -41,7 +42,8 @@ export default function BarChart({
   datasets, 
   title, 
   className = '',
-  horizontal = false 
+  horizontal = false,
+  stacked = false
 }: BarChartProps) {
   const chartRef = useRef<HTMLCanvasElement>(null)
   const chartInstance = useRef<ChartJS | null>(null)
@@ -75,6 +77,7 @@ export default function BarChart({
         maintainAspectRatio: false,
         scales: {
           x: {
+            stacked: stacked,
             beginAtZero: true,
             ticks: {
               precision: 0,
@@ -87,6 +90,7 @@ export default function BarChart({
             }
           },
           y: {
+            stacked: stacked,
             beginAtZero: true,
             ticks: {
               precision: 0,
@@ -130,7 +134,7 @@ export default function BarChart({
         chartInstance.current.destroy()
       }
     }
-  }, [labels, datasets, horizontal])
+  }, [labels, datasets, horizontal, stacked])
 
   return (
     <div className={`bg-white rounded-xl shadow-lg p-6 ${className}`}>

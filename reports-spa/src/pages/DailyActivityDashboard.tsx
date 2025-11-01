@@ -109,6 +109,8 @@ export default function DailyActivityDashboard() {
           data.developers.reduce((sum, dev) => sum + dev.off_hours.jira, 0)
         ],
         backgroundColor: '#4B0082',
+        borderColor: '#4B0082',
+        borderWidth: 1,
       },
       {
         label: 'Repo Actions',
@@ -119,6 +121,8 @@ export default function DailyActivityDashboard() {
           data.developers.reduce((sum, dev) => sum + dev.off_hours.repo, 0)
         ],
         backgroundColor: '#66CC00',
+        borderColor: '#66CC00',
+        borderWidth: 1,
       },
     ],
   }
@@ -151,7 +155,7 @@ export default function DailyActivityDashboard() {
         />
         <MetricCard
           title="Most Active Bucket"
-          value={data.summary.most_active_bucket}
+          value={bucketDisplayNames[data.summary.most_active_bucket] || data.summary.most_active_bucket}
           colorClass="border-telus-blue"
         />
         <MetricCard
@@ -221,10 +225,12 @@ export default function DailyActivityDashboard() {
       </div>
 
       {/* Charts */}
-      <div className="bg-white rounded-lg shadow-md p-6">
-        <h2 className="text-xl font-bold text-telus-purple mb-4">Activity by Time Bucket</h2>
-        <BarChart data={bucketActivityData} stacked={true} />
-      </div>
+      <BarChart 
+        labels={bucketActivityData.labels} 
+        datasets={bucketActivityData.datasets}
+        title="Activity by Time Bucket"
+        stacked={true}
+      />
 
       {/* Summary Statistics */}
       <div className="bg-white rounded-lg shadow-md p-6">
