@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { getDailyActivityData } from '@/data/embeddedData'
-import { BarChart, MetricCard } from '@/components'
+import { BarChart } from '@/components'
+import { DoughnutChart } from '@/components/charts'
 
 interface TimeBucket {
   jira: number
@@ -12,6 +13,7 @@ interface Developer {
   name: string
   email: string
   buckets: {
+    '8am-10am': TimeBucket
     '10am-12pm': TimeBucket
     '12pm-2pm': TimeBucket
     '2pm-4pm': TimeBucket
@@ -46,12 +48,13 @@ export default function DailyActivityDashboard() {
   const [data, setData] = useState<DailyActivityReport | null>(null)
   const [loading, setLoading] = useState(true)
 
-  // Map interval labels to display labels (cutoff times)
+  // Map interval labels to display labels (cutoff times - max of each bucket)
   const bucketDisplayNames: Record<string, string> = {
-    '10am-12pm': '10am',
-    '12pm-2pm': '12pm',
-    '2pm-4pm': '2pm',
-    '4pm-6pm': '4pm'
+    '8am-10am': '10am',
+    '10am-12pm': '12pm',
+    '12pm-2pm': '2pm',
+    '2pm-4pm': '4pm',
+    '4pm-6pm': '6pm'
   }
 
   useEffect(() => {
@@ -127,133 +130,173 @@ export default function DailyActivityDashboard() {
     ],
   }
 
+  // Off-hours comparison data for doughnut chart
+  const offHoursData = {
+    labels: ['Regular Hours', 'Off-Hours'],
+    data: [
+      data.summary.total_activity - data.summary.off_hours_activity,
+      data.summary.off_hours_activity,
+    ],
+  }
+
+  // Developer comparison data for horizontal bar chart
+  const developerComparisonData = {
+    labels: data.developers
+      .filter((d) => d.daily_total.total > 0)
+      .slice(0, 10)
+      .map((d) => d.name.split(' ')[0]),
+    datasets: [
+      {
+        label: 'Jira',
+        data: data.developers
+          .filter((d) => d.daily_total.total > 0)
+          .slice(0, 10)
+          .map((d) => d.daily_total.jira),
+        backgroundColor: '#4B0082',
+      },
+      {
+        label: 'Repo',
+        data: data.developers
+          .filter((d) => d.daily_total.total > 0)
+          .slice(0, 10)
+          .map((d) => d.daily_total.repo),
+        backgroundColor: '#66CC00',
+      },
+    ],
+  }
+
   const activeDevelopers = data.developers.filter(d => d.daily_total.total > 0).slice(0, 15)
 
   return (
-    <div className="space-y-6">
+    <div className="min-h-screen bg-gray-50">
       {/* Header */}
-      <div>
-        <h1 className="text-3xl font-bold text-telus-purple mb-2">Daily Activity Report</h1>
-        <div className="text-gray-600 text-sm space-y-1">
-          <p>Report Date: <span className="font-semibold">{data.metadata.report_date}</span></p>
-          <p>Timezone: <span className="font-semibold">{data.metadata.timezone}</span></p>
-          <p>Generated: <span className="font-semibold">{new Date(data.generated_at).toLocaleString()}</span></p>
+      <div className="gradient-bg text-white py-12">
+        <div className="container mx-auto px-6">
+          <h1 className="text-4xl font-bold mb-4">Daily Activity Report</h1>
+          <p className="text-xl opacity-90">
+            Report Date: {data.metadata.report_date} • Timezone: {data.metadata.timezone}
+          </p>
         </div>
       </div>
 
-      {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <MetricCard
-          title="Total Developers"
-          value={data.summary.total_developers}
-          color="purple"
-        />
-        <MetricCard
-          title="Total Activity"
-          value={data.summary.total_activity}
-          color="green"
-        />
-        <MetricCard
-          title="Most Active Bucket"
-          value={bucketDisplayNames[data.summary.most_active_bucket] || data.summary.most_active_bucket}
-          color="blue"
-        />
-        <MetricCard
-          title="Off-Hours Activity"
-          value={`${data.summary.off_hours_percentage}%`}
-          color="orange"
-        />
-      </div>
+      <div className="container mx-auto px-6 py-8">
+        {/* Summary Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-12">
+          <div className="card-hover bg-white rounded-xl shadow-lg p-6 border-l-4 border-telus-purple">
+            <div className="text-gray-600 text-sm">Total Developers</div>
+            <div className="text-3xl font-bold text-telus-purple">
+              {data.summary.total_developers}
+            </div>
+          </div>
+          <div className="card-hover bg-white rounded-xl shadow-lg p-6 border-l-4 border-telus-green">
+            <div className="text-gray-600 text-sm">Total Activity</div>
+            <div className="text-3xl font-bold text-telus-green">
+              {data.summary.total_activity}
+            </div>
+          </div>
+          <div className="card-hover bg-white rounded-xl shadow-lg p-6 border-l-4 border-telus-blue">
+            <div className="text-gray-600 text-sm">Most Active Bucket</div>
+            <div className="text-xl font-bold text-telus-blue">
+              {bucketDisplayNames[data.summary.most_active_bucket] || data.summary.most_active_bucket}
+            </div>
+          </div>
+          <div className="card-hover bg-white rounded-xl shadow-lg p-6 border-l-4 border-orange-500">
+            <div className="text-gray-600 text-sm">Off-Hours Activity</div>
+            <div className="text-3xl font-bold text-orange-500">
+              {data.summary.off_hours_percentage}%
+            </div>
+          </div>
+        </div>
 
-      {/* Activity Heatmap */}
-      <div className="bg-white rounded-lg shadow-md p-6">
-        <h2 className="text-xl font-bold text-telus-purple mb-4">Activity Heatmap</h2>
-        <div className="overflow-x-auto">
-          <table className="min-w-full bg-white border border-gray-200 text-sm">
-            <thead className="bg-telus-purple text-white">
-              <tr>
-                <th className="px-4 py-3 text-left">Developer</th>
-                {data.metadata.time_buckets.map(bucket => (
-                  <th key={bucket} className="px-4 py-3 text-center">
-                    {bucketDisplayNames[bucket] || bucket}
-                  </th>
-                ))}
-                <th className="px-4 py-3 text-center bg-orange-600">Off-Hours</th>
-                <th className="px-4 py-3 text-center bg-telus-green">Total</th>
-              </tr>
-            </thead>
-            <tbody>
-              {activeDevelopers.map((dev, idx) => (
-                <tr key={idx} className="border-t hover:bg-gray-50">
-                  <td className="px-4 py-2 font-medium">{dev.name}</td>
-                  {(['10am-12pm', '12pm-2pm', '2pm-4pm', '4pm-6pm'] as const).map(bucket => (
-                    <td key={bucket} className={`px-4 py-2 text-center ${getIntensityColor(dev.buckets[bucket].total)}`}>
-                      <div className="font-bold">{dev.buckets[bucket].total || '-'}</div>
-                      {dev.buckets[bucket].total > 0 && (
-                        <div className="text-xs">J:{dev.buckets[bucket].jira} R:{dev.buckets[bucket].repo}</div>
+        {/* Activity Heatmap */}
+        <div className="card-hover bg-white rounded-xl shadow-lg p-6 mb-12">
+          <h2 className="text-2xl font-bold text-telus-purple mb-4">
+            Activity Heatmap
+          </h2>
+          <div className="overflow-x-auto">
+            <table className="min-w-full bg-white border border-gray-200 text-sm">
+              <thead className="bg-telus-purple text-white">
+                <tr>
+                  <th className="px-4 py-3 text-left">Developer</th>
+                  {data.metadata.time_buckets.map(bucket => (
+                    <th key={bucket} className="px-4 py-3 text-center">
+                      {bucketDisplayNames[bucket] || bucket}
+                    </th>
+                  ))}
+                  <th className="px-4 py-3 text-center bg-orange-600">Off-Hours</th>
+                  <th className="px-4 py-3 text-center bg-telus-green">Total</th>
+                </tr>
+              </thead>
+              <tbody>
+                {activeDevelopers.map((dev, idx) => (
+                  <tr key={idx} className="border-t hover:bg-gray-50">
+                    <td className="px-4 py-2 font-medium">{dev.name}</td>
+                    {(['8am-10am', '10am-12pm', '12pm-2pm', '2pm-4pm', '4pm-6pm'] as const).map(bucket => (
+                      <td key={bucket} className={`px-4 py-2 text-center ${getIntensityColor(dev.buckets[bucket].total)}`}>
+                        <div className="font-bold">{dev.buckets[bucket].total || '-'}</div>
+                        {dev.buckets[bucket].total > 0 && (
+                          <div className="text-xs">J:{dev.buckets[bucket].jira} R:{dev.buckets[bucket].repo}</div>
+                        )}
+                      </td>
+                    ))}
+                    <td className={`px-4 py-2 text-center ${getOffHoursColor(dev.off_hours.total)}`}>
+                      <div className="font-bold">{dev.off_hours.total || '-'}</div>
+                      {dev.off_hours.total > 0 && (
+                        <div className="text-xs">J:{dev.off_hours.jira} R:{dev.off_hours.repo}</div>
                       )}
                     </td>
-                  ))}
-                  <td className={`px-4 py-2 text-center ${getOffHoursColor(dev.off_hours.total)}`}>
-                    <div className="font-bold">{dev.off_hours.total || '-'}</div>
-                    {dev.off_hours.total > 0 && (
-                      <div className="text-xs">J:{dev.off_hours.jira} R:{dev.off_hours.repo}</div>
-                    )}
-                  </td>
-                  <td className="px-4 py-2 text-center bg-green-100 font-bold">
-                    {dev.daily_total.total}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-          <div className="mt-4 text-xs text-gray-600 flex gap-4">
-            <span className="flex items-center gap-2">
-              <span className="w-4 h-4 bg-green-600"></span> High (10+)
-            </span>
-            <span className="flex items-center gap-2">
-              <span className="w-4 h-4 bg-green-400"></span> Medium (5-9)
-            </span>
-            <span className="flex items-center gap-2">
-              <span className="w-4 h-4 bg-yellow-300"></span> Low (3-4)
-            </span>
-            <span className="flex items-center gap-2">
-              <span className="w-4 h-4 bg-blue-200"></span> Minimal (1-2)
-            </span>
+                    <td className="px-4 py-2 text-center bg-green-100 font-bold">
+                      {dev.daily_total.total}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            <div className="mt-4 text-xs text-gray-600 flex gap-4">
+              <span className="flex items-center gap-2">
+                <span className="w-4 h-4 bg-green-600"></span> High (10+)
+              </span>
+              <span className="flex items-center gap-2">
+                <span className="w-4 h-4 bg-green-400"></span> Medium (5-9)
+              </span>
+              <span className="flex items-center gap-2">
+                <span className="w-4 h-4 bg-yellow-300"></span> Low (3-4)
+              </span>
+              <span className="flex items-center gap-2">
+                <span className="w-4 h-4 bg-blue-200"></span> Minimal (1-2)
+              </span>
+            </div>
           </div>
         </div>
-      </div>
 
-      {/* Charts */}
-      <BarChart 
-        labels={bucketActivityData.labels} 
-        datasets={bucketActivityData.datasets}
-        title="Activity by Time Bucket"
-        stacked={true}
-      />
+        {/* Charts */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-12">
+          <BarChart 
+            labels={bucketActivityData.labels} 
+            datasets={bucketActivityData.datasets}
+            title="Activity by Time Bucket"
+            stacked={true}
+          />
+          <DoughnutChart
+            labels={offHoursData.labels}
+            data={offHoursData.data}
+            title="Regular vs Off-Hours Activity"
+          />
+        </div>
 
-      {/* Summary Statistics */}
-      <div className="bg-white rounded-lg shadow-md p-6">
-        <h2 className="text-xl font-bold text-telus-purple mb-4">Summary</h2>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
-          <div>
-            <div className="text-2xl font-bold text-telus-purple">{data.summary.total_jira_actions}</div>
-            <div className="text-sm text-gray-600">Jira Actions</div>
-          </div>
-          <div>
-            <div className="text-2xl font-bold text-telus-green">{data.summary.total_repo_actions}</div>
-            <div className="text-sm text-gray-600">Repo Actions</div>
-          </div>
-          <div>
-            <div className="text-2xl font-bold text-orange-500">{data.summary.off_hours_activity}</div>
-            <div className="text-sm text-gray-600">Off-Hours Actions</div>
-          </div>
-          <div>
-            <div className="text-2xl font-bold text-telus-blue">
-              {data.summary.bucket_totals[data.summary.most_active_bucket] || 0}
-            </div>
-            <div className="text-sm text-gray-600">Peak Bucket</div>
-          </div>
+        <div className="mb-12">
+          <BarChart
+            labels={developerComparisonData.labels}
+            datasets={developerComparisonData.datasets}
+            title="Ranking - Jira vs Repo Activity"
+            horizontal={true}
+          />
+        </div>
+
+        {/* Footer */}
+        <div className="mt-8 text-center text-gray-600">
+          <p className="text-sm">📅 Daily Activity Report</p>
+          <p className="text-xs mt-2 opacity-75">Activity tracked by time buckets with off-hours analysis</p>
         </div>
       </div>
     </div>
