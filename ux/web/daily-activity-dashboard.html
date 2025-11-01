@@ -125,7 +125,7 @@
           return "bg-yellow-200 text-gray-900";
         };
 
-        const buckets = ["10am-12pm", "12pm-2pm", "2pm-4pm", "4pm-6pm"];
+        const buckets = ["8am-10am", "10am-12pm", "12pm-2pm", "2pm-4pm", "4pm-6pm"];
 
         return (
           <div className="overflow-x-auto">
@@ -211,8 +211,9 @@
         const [data, setData] = useState(null);
         const [loading, setLoading] = useState(true);
 
-        // Map interval labels to display labels (cutoff times)
+        // Map interval labels to display labels (start times for each 2-hour window)
         const bucketDisplayNames = {
+          "8am-10am": "8am",
           "10am-12pm": "10am",
           "12pm-2pm": "12pm",
           "2pm-4pm": "2pm",
