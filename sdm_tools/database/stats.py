@@ -1976,6 +1976,7 @@ def get_daily_activity_by_buckets(target_date=None, tz=None):
     """Get developer activity by time buckets for a specific date.
     
     Time buckets:
+        - "8am-10am": 08:00-09:59
         - "10am-12pm": 10:00-11:59
         - "12pm-2pm": 12:00-13:59
         - "2pm-4pm": 14:00-15:59
@@ -2037,6 +2038,7 @@ def get_daily_activity_by_buckets(target_date=None, tz=None):
                     "name": name,
                     "email": email,
                     "buckets": {
+                        "8am-10am": {"jira": 0, "repo": 0, "total": 0},
                         "10am-12pm": {"jira": 0, "repo": 0, "total": 0},
                         "12pm-2pm": {"jira": 0, "repo": 0, "total": 0},
                         "2pm-4pm": {"jira": 0, "repo": 0, "total": 0},
@@ -2328,7 +2330,7 @@ def generate_daily_report_json(target_date=None, output_file=None):
         "metadata": {
             "report_date": str(target_date),
             "timezone": str(tz),
-            "time_buckets": ["10am-12pm", "12pm-2pm", "2pm-4pm", "4pm-6pm"],
+            "time_buckets": ["8am-10am", "10am-12pm", "12pm-2pm", "2pm-4pm", "4pm-6pm"],
             "off_hours_window": "6pm previous day to 8am current day"
         },
         "developers": developers_list,
@@ -2429,6 +2431,7 @@ def display_daily_report_summary(daily_activity_data=None, json_file=None):
     
     # Add columns
     table.add_column("Developer", style="bold white", width=25)
+    table.add_column("8am", justify="center", width=12)
     table.add_column("10am", justify="center", width=12)
     table.add_column("12pm", justify="center", width=12)
     table.add_column("2pm", justify="center", width=12)
@@ -2457,6 +2460,7 @@ def display_daily_report_summary(daily_activity_data=None, json_file=None):
     total_repo = 0
     total_activity = 0
     bucket_totals = {
+        "8am-10am": 0,
         "10am-12pm": 0,
         "12pm-2pm": 0,
         "2pm-4pm": 0,
@@ -2477,6 +2481,11 @@ def display_daily_report_summary(daily_activity_data=None, json_file=None):
         name = dev['name'][:24]  # Truncate long names
         
         # Format each bucket
+        bucket_8_10 = format_cell(
+            dev['buckets']['8am-10am']['total'],
+            dev['buckets']['8am-10am']['jira'],
+            dev['buckets']['8am-10am']['repo']
+        )
         bucket_10_12 = format_cell(
             dev['buckets']['10am-12pm']['total'],
             dev['buckets']['10am-12pm']['jira'],
@@ -2505,13 +2514,13 @@ def display_daily_report_summary(daily_activity_data=None, json_file=None):
         
         total = f"[bold]{dev['daily_total']['total']}[/bold]"
         
-        table.add_row(name, bucket_10_12, bucket_12_2, bucket_2_4, bucket_4_6, off_hours, total)
+        table.add_row(name, bucket_8_10, bucket_10_12, bucket_12_2, bucket_2_4, bucket_4_6, off_hours, total)
         
         # Accumulate totals
         total_jira += dev['daily_total']['jira']
         total_repo += dev['daily_total']['repo']
         total_activity += dev['daily_total']['total']
-        
+        bucket_totals["8am-10am"] += dev['buckets']['8am-10am']['total']
         bucket_totals["10am-12pm"] += dev['buckets']['10am-12pm']['total']
         bucket_totals["12pm-2pm"] += dev['buckets']['12pm-2pm']['total']
         bucket_totals["2pm-4pm"] += dev['buckets']['2pm-4pm']['total']
@@ -2521,11 +2530,12 @@ def display_daily_report_summary(daily_activity_data=None, json_file=None):
         displayed_count += 1
     
     # Add separator
-    table.add_row("─" * 24, "─" * 10, "─" * 10, "─" * 10, "─" * 10, "─" * 10, "─" * 8, style="dim")
+    table.add_row("─" * 24, "─" * 10, "─" * 10, "─" * 10, "─" * 10, "─" * 10, "─" * 10, "─" * 8, style="dim")
     
     # Add totals row
     table.add_row(
         f"[bold cyan]TOTALS ({displayed_count} devs)[/bold cyan]",
+        f"[bold]{bucket_totals['8am-10am']}[/bold]",
         f"[bold]{bucket_totals['10am-12pm']}[/bold]",
         f"[bold]{bucket_totals['12pm-2pm']}[/bold]",
         f"[bold]{bucket_totals['2pm-4pm']}[/bold]",
