@@ -115,6 +115,7 @@ declare global {
   interface Window {
     __SPRINT_DATA__?: TeamSprintData
     __ACTIVITY_DATA__?: DeveloperActivityData
+    __DAILY_ACTIVITY_DATA__?: any
   }
 }
 

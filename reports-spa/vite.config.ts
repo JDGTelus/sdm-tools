@@ -12,9 +12,11 @@ function embedDataPlugin() {
       // Paths to JSON data files
       const sprintDataPath = path.resolve(__dirname, '../ux/web/data/team_sprint_stats.json')
       const activityDataPath = path.resolve(__dirname, '../ux/web/data/developer_activity.json')
+      const dailyDataPath = path.resolve(__dirname, '../ux/web/data/daily_activity_report.json')
       
       let sprintData = '{}'
       let activityData = '{}'
+      let dailyData = '{}'
       
       // Read JSON files if they exist
       try {
@@ -29,6 +31,12 @@ function embedDataPlugin() {
         } else {
           console.warn('⚠️  Activity data not found:', activityDataPath)
         }
+        
+        if (fs.existsSync(dailyDataPath)) {
+          dailyData = fs.readFileSync(dailyDataPath, 'utf-8')
+        } else {
+          console.warn('⚠️  Daily activity data not found:', dailyDataPath)
+        }
       } catch (error) {
         console.error('Error reading data files:', error)
       }
@@ -38,6 +46,7 @@ function embedDataPlugin() {
     <script>
       window.__SPRINT_DATA__ = ${sprintData};
       window.__ACTIVITY_DATA__ = ${activityData};
+      window.__DAILY_ACTIVITY_DATA__ = ${dailyData};
     </script>`
       
       return html.replace('</head>', `${dataScript}\n  </head>`)

@@ -146,22 +146,22 @@ export default function DailyActivityDashboard() {
         <MetricCard
           title="Total Developers"
           value={data.summary.total_developers}
-          colorClass="border-telus-purple"
+          color="purple"
         />
         <MetricCard
           title="Total Activity"
           value={data.summary.total_activity}
-          colorClass="border-telus-green"
+          color="green"
         />
         <MetricCard
           title="Most Active Bucket"
           value={bucketDisplayNames[data.summary.most_active_bucket] || data.summary.most_active_bucket}
-          colorClass="border-telus-blue"
+          color="blue"
         />
         <MetricCard
           title="Off-Hours Activity"
           value={`${data.summary.off_hours_percentage}%`}
-          colorClass="border-orange-500"
+          color="orange"
         />
       </div>
 
