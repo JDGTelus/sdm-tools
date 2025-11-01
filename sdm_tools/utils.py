@@ -141,12 +141,12 @@ def get_time_bucket(dt):
     """Returns the time bucket name for a given datetime.
     
     Buckets:
+        - "8am-10am": 08:00-09:59
         - "10am-12pm": 10:00-11:59
         - "12pm-2pm": 12:00-13:59
         - "2pm-4pm": 14:00-15:59
         - "4pm-6pm": 16:00-17:59
         - "off_hours": 18:00-07:59 (6pm to 8am)
-        - None: 8:00-09:59 (not tracked)
     
     Args:
         dt: datetime object (should be timezone-aware)
@@ -159,7 +159,9 @@ def get_time_bucket(dt):
     
     hour = dt.hour
     
-    if 10 <= hour < 12:
+    if 8 <= hour < 10:
+        return "8am-10am"
+    elif 10 <= hour < 12:
         return "10am-12pm"
     elif 12 <= hour < 14:
         return "12pm-2pm"
@@ -170,7 +172,6 @@ def get_time_bucket(dt):
     elif hour >= 18 or hour < 8:
         return "off_hours"
     else:
-        # 8am-10am not tracked
         return None
 
 
@@ -306,7 +307,7 @@ def get_all_time_buckets():
     Returns:
         List of bucket name strings
     """
-    return ["10am-12pm", "12pm-2pm", "2pm-4pm", "4pm-6pm", "off_hours"]
+    return ["8am-10am", "10am-12pm", "12pm-2pm", "2pm-4pm", "4pm-6pm", "off_hours"]
 
 
 def format_datetime_local(dt, fmt="%Y-%m-%d %H:%M:%S %Z"):
