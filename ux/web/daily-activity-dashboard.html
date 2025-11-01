@@ -103,7 +103,7 @@
         };
 
         // Activity Heatmap Component
-        const ActivityHeatmap = ({ developers }) => {
+        const ActivityHeatmap = ({ developers, bucketDisplayNames }) => {
             const getIntensityColor = (total) => {
                 if (total === 0) return 'bg-gray-100 text-gray-400';
                 if (total >= 10) return 'bg-green-600 text-white';
@@ -119,16 +119,19 @@
                 return 'bg-yellow-200 text-gray-900';
             };
 
+            const buckets = ['10am-12pm', '12pm-2pm', '2pm-4pm', '4pm-6pm'];
+
             return (
                 <div className="overflow-x-auto">
                     <table className="min-w-full bg-white border border-gray-200 text-sm">
                         <thead className="bg-telus-purple text-white">
                             <tr>
                                 <th className="px-4 py-3 text-left">Developer</th>
-                                <th className="px-4 py-3 text-center">10am-12pm</th>
-                                <th className="px-4 py-3 text-center">12pm-2pm</th>
-                                <th className="px-4 py-3 text-center">2pm-4pm</th>
-                                <th className="px-4 py-3 text-center">4pm-6pm</th>
+                                {buckets.map(bucket => (
+                                    <th key={bucket} className="px-4 py-3 text-center">
+                                        {bucketDisplayNames[bucket] || bucket}
+                                    </th>
+                                ))}
                                 <th className="px-4 py-3 text-center bg-orange-600">Off-Hours</th>
                                 <th className="px-4 py-3 text-center bg-telus-green">Total</th>
                             </tr>
@@ -137,10 +140,10 @@
                             {developers.filter(d => d.daily_total.total > 0).slice(0, 15).map((dev, idx) => (
                                 <tr key={idx} className="border-t hover:bg-gray-50">
                                     <td className="px-4 py-2 font-medium">{dev.name}</td>
-                                    {['10am-12pm', '12pm-2pm', '2pm-4pm', '4pm-6pm'].map(bucket => (
-                                        <td key={bucket} className={`px-4 py-2 text-center ${getIntensityColor(dev.buckets[bucket].total)}`}>
-                                            <div className="font-bold">{dev.buckets[bucket].total || '-'}</div>
-                                            {dev.buckets[bucket].total > 0 && (
+                                    {buckets.map(bucket => (
+                                        <td key={bucket} className={`px-4 py-2 text-center ${getIntensityColor(dev.buckets[bucket]?.total || 0)}`}>
+                                            <div className="font-bold">{dev.buckets[bucket]?.total || '-'}</div>
+                                            {dev.buckets[bucket]?.total > 0 && (
                                                 <div className="text-xs">J:{dev.buckets[bucket].jira} R:{dev.buckets[bucket].repo}</div>
                                             )}
                                         </td>
@@ -181,6 +184,14 @@
             const [data, setData] = useState(null);
             const [loading, setLoading] = useState(true);
 
+            // Map interval labels to display labels (cutoff times)
+            const bucketDisplayNames = {
+                '10am-12pm': '10am',
+                '12pm-2pm': '12pm',
+                '2pm-4pm': '2pm',
+                '4pm-6pm': '4pm'
+            };
+
             useEffect(() => {
                 fetch('./data/daily_activity_report.json')
                     .then(res => res.json())
@@ -212,13 +223,13 @@
 
             // Prepare chart data
             const bucketActivityData = {
-                labels: data.metadata.time_buckets.concat(['Off-Hours']),
+                labels: data.metadata.time_buckets.map(b => bucketDisplayNames[b] || b).concat(['Off-Hours']),
                 datasets: [
                     {
                         label: 'Jira Actions',
                         data: [
                             ...data.metadata.time_buckets.map(bucket => 
-                                data.developers.reduce((sum, dev) => sum + dev.buckets[bucket].jira, 0)
+                                data.developers.reduce((sum, dev) => sum + (dev.buckets[bucket]?.jira || 0), 0)
                             ),
                             data.developers.reduce((sum, dev) => sum + dev.off_hours.jira, 0)
                         ],
@@ -228,7 +239,7 @@
                         label: 'Repo Actions',
                         data: [
                             ...data.metadata.time_buckets.map(bucket => 
-                                data.developers.reduce((sum, dev) => sum + dev.buckets[bucket].repo, 0)
+                                data.developers.reduce((sum, dev) => sum + (dev.buckets[bucket]?.repo || 0), 0)
                             ),
                             data.developers.reduce((sum, dev) => sum + dev.off_hours.repo, 0)
                         ],
@@ -296,7 +307,7 @@
                     {/* Activity Heatmap */}
                     <div className="bg-white rounded-lg shadow p-6 mb-8">
                         <h2 className="text-2xl font-bold text-telus-purple mb-4">Activity Heatmap</h2>
-                        <ActivityHeatmap developers={data.developers} />
+                        <ActivityHeatmap developers={data.developers} bucketDisplayNames={bucketDisplayNames} />
                     </div>
 
                     {/* Charts */}

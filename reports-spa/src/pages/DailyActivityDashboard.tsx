@@ -46,6 +46,14 @@ export default function DailyActivityDashboard() {
   const [data, setData] = useState<DailyActivityReport | null>(null)
   const [loading, setLoading] = useState(true)
 
+  // Map interval labels to display labels (cutoff times)
+  const bucketDisplayNames: Record<string, string> = {
+    '10am-12pm': '10am',
+    '12pm-2pm': '12pm',
+    '2pm-4pm': '2pm',
+    '4pm-6pm': '4pm'
+  }
+
   useEffect(() => {
     const dailyData = getDailyActivityData()
     if (dailyData) {
@@ -90,7 +98,7 @@ export default function DailyActivityDashboard() {
 
   // Prepare chart data
   const bucketActivityData = {
-    labels: [...data.metadata.time_buckets, 'Off-Hours'],
+    labels: [...data.metadata.time_buckets.map(b => bucketDisplayNames[b] || b), 'Off-Hours'],
     datasets: [
       {
         label: 'Jira Actions',
@@ -161,10 +169,11 @@ export default function DailyActivityDashboard() {
             <thead className="bg-telus-purple text-white">
               <tr>
                 <th className="px-4 py-3 text-left">Developer</th>
-                <th className="px-4 py-3 text-center">10am-12pm</th>
-                <th className="px-4 py-3 text-center">12pm-2pm</th>
-                <th className="px-4 py-3 text-center">2pm-4pm</th>
-                <th className="px-4 py-3 text-center">4pm-6pm</th>
+                {data.metadata.time_buckets.map(bucket => (
+                  <th key={bucket} className="px-4 py-3 text-center">
+                    {bucketDisplayNames[bucket] || bucket}
+                  </th>
+                ))}
                 <th className="px-4 py-3 text-center bg-orange-600">Off-Hours</th>
                 <th className="px-4 py-3 text-center bg-telus-green">Total</th>
               </tr>

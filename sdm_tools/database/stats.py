@@ -2429,10 +2429,10 @@ def display_daily_report_summary(daily_activity_data=None, json_file=None):
     
     # Add columns
     table.add_column("Developer", style="bold white", width=25)
-    table.add_column("10am-12pm", justify="center", width=12)
-    table.add_column("12pm-2pm", justify="center", width=12)
-    table.add_column("2pm-4pm", justify="center", width=12)
-    table.add_column("4pm-6pm", justify="center", width=12)
+    table.add_column("10am", justify="center", width=12)
+    table.add_column("12pm", justify="center", width=12)
+    table.add_column("2pm", justify="center", width=12)
+    table.add_column("4pm", justify="center", width=12)
     table.add_column("Off-Hours", justify="center", width=12, style="yellow")
     table.add_column("Total", justify="center", width=10, style="bold green")
     
