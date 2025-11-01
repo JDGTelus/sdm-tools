@@ -25,13 +25,14 @@ SDM-Tools is a comprehensive command-line interface (CLI) tool designed for Soft
 #### Vite SPA (Recommended)
 - **Modern React-based SPA**: Single-page application built with React, TypeScript, and Vite
 - **Self-Contained Bundle**: All data and assets embedded at build time
-- **Four Integrated Dashboards**:
+- **Five Integrated Dashboards**:
   - **Team Sprint Dashboard**: Sprint-focused activity with developer performance cards
   - **Team KPI Dashboard**: Key performance indicators and team rankings
   - **Developer Activity Dashboard**: Individual activity tracking with sprint filtering and charts
   - **Developer Comparison Dashboard**: Compare individual performance against team benchmarks
+  - **Daily Activity Dashboard**: Time-bucketed activity analysis with off-hours tracking
 - **Sidebar Navigation**: Seamless navigation between all dashboards
-- **Interactive Visualizations**: Radar charts, pie charts, and bar charts using Chart.js
+- **Interactive Visualizations**: Radar charts, pie charts, doughnut charts, and bar charts using Chart.js
 - **Responsive Design**: Mobile-friendly interface with Tailwind CSS
 - **Offline Capable**: No external API calls, works completely offline
 - **TypeScript Support**: Full type safety and modern development experience
@@ -165,12 +166,20 @@ The CLI provides the following options:
    - Provide all-time developer summaries with sprint breakdowns
    - Save to `ux/web/data/developer_activity.json`
 
-5. **Generate dashboards**
+5. **Daily activity report JSON (generate/display)**
+   - Generate time-bucketed activity analysis for a specific date
+   - Track activity by 2-hour time buckets (8am-10am, 10am-12pm, etc.)
+   - Identify off-hours activity (outside standard work hours)
+   - Include both Jira and repository actions per time bucket
+   - Activity heatmap showing intensity by developer and time
+   - Save to `ux/web/data/daily_activity_report.json`
+
+6. **Generate dashboards**
    - **Option B (Recommended): Vite SPA Single-File Bundle**
      - Builds modern React SPA into a single HTML file
-     - Output: `dist/reports/index.html` (one file, ~597KB)
+     - Output: `dist/reports/index.html` (one file, ~600KB)
      - All JavaScript, CSS, and data inlined
-     - Features sidebar navigation between all 4 dashboards
+     - Features sidebar navigation between all 5 dashboards
      - Modern UI with interactive charts and filtering
      - TypeScript-based for better code quality
      - Can be shared as a single file attachment
@@ -180,7 +189,7 @@ The CLI provides the following options:
      - No navigation between dashboards
      - Will be removed in a future version
 
-6. **Exit**
+7. **Exit**
 
 ### Dashboard Features (Vite SPA)
 
@@ -217,6 +226,19 @@ The CLI provides the following options:
 - **Interactive Table**: Click any developer row to view detailed comparison
 - **Completion Rate**: Individual vs team completion percentage
 
+#### Daily Activity Dashboard
+- **Time-Bucketed Analysis**: Activity broken down by 2-hour time buckets throughout the day
+- **Off-Hours Tracking**: Identify and quantify work done outside standard hours
+- **Activity Heatmap**: Color-coded table showing activity intensity by developer and time
+- **Summary Cards**: Total developers, total activity, most active bucket, off-hours percentage
+- **Interactive Charts**:
+  - **Activity by Time Bucket**: Stacked bar chart showing Jira and Repo actions per time period
+  - **Regular vs Off-Hours**: Doughnut chart comparing work done in standard hours vs off-hours
+  - **Developer Rankings**: Vertical bar chart showing top 10 developers by total activity
+- **Intensity Colors**: Visual indicators (green, yellow, blue) showing activity levels
+- **Date-Specific Reports**: Generate reports for any specific date
+- **Timezone Support**: Respects configured timezone for accurate time bucket assignment
+
 ### Dashboard Navigation (Vite SPA)
 - **Sidebar Menu**: Persistent sidebar with collapsible design
 - **Active Route Highlighting**: Visual indication of current dashboard
@@ -225,30 +247,31 @@ The CLI provides the following options:
 
 ### Generated Files
 
-#### Vite SPA Bundle (Option 5b - Recommended)
-When using option 5b, the tool generates:
-- `dist/reports/index.html`: **Single self-contained HTML file (~597KB)**
+#### Vite SPA Bundle (Option 6b - Recommended)
+When using option 6b, the tool generates:
+- `dist/reports/index.html`: **Single self-contained HTML file (~600KB)**
   - All JavaScript inlined
   - All CSS inlined
-  - All data embedded
+  - All data embedded (sprint stats, developer activity, daily activity)
   - No external dependencies
 
 The SPA bundle:
 - **Truly single-file**: Everything in one HTML file
-- Contains all 4 dashboards in a single application
-- Has all data embedded directly in the HTML
+- Contains all 5 dashboards in a single application
+- Has all data embedded directly in the HTML at build time
 - Works completely offline without any external requests
 - Can be shared as a single file or deployed to any web server
 - Supports client-side routing for seamless navigation
 - Can be opened directly in any browser
 - Viewed on any device (desktop, tablet, mobile)
 
-#### Legacy HTML Files (Option 5a - Deprecated)
-When using option 5a, the tool generates:
+#### Legacy HTML Files (Option 6a - Deprecated)
+When using option 6a, the tool generates:
 - `dist/team-sprint-dashboard.html`: Sprint analytics dashboard
 - `dist/team-sprint-kpi-dashboard.html`: KPI dashboard
 - `dist/developer-activity-dashboard.html`: Activity dashboard
 - `dist/developer-comparison-dashboard.html`: Comparison dashboard
+- `dist/daily-activity-dashboard.html`: Daily activity dashboard
 - Timestamped backups of any existing files
 
 **Note**: Legacy HTML generation is deprecated and will be removed in a future version.
@@ -310,12 +333,33 @@ sdm-tools/
 └── README.md             # This file
 ```
 
+## Recent Updates
+
+### Daily Activity Dashboard (November 2025)
+- **NEW**: Added comprehensive Daily Activity Dashboard with time-bucketed analysis
+- **Time Buckets**: Activity tracked in 2-hour intervals (8am-10am, 10am-12pm, 12pm-2pm, 2pm-4pm, 4pm-6pm)
+- **Off-Hours Tracking**: Automatic detection and quantification of work outside standard hours
+- **Activity Heatmap**: Color-coded visualization showing activity intensity per developer and time bucket
+- **Multiple Charts**: 
+  - Activity by Time Bucket (stacked bar chart)
+  - Regular vs Off-Hours Activity (doughnut chart)
+  - Developer Rankings (vertical bar chart)
+- **Full SPA Integration**: Seamlessly integrated into the Vite SPA bundle with sidebar navigation
+- **Visual Consistency**: Matches the design and structure of all other dashboards
+- **DoughnutChart Component**: Added new chart component for enhanced visualizations
+
+### Bundle Improvements
+- **Updated Bundle Size**: ~600KB (from ~597KB) to include daily activity dashboard
+- **Five Dashboards**: Complete suite now includes Team Sprint, Team KPI, Developer Activity, Developer Comparison, and Daily Activity
+- **Enhanced Navigation**: Sidebar updated with Daily Activity Report icon and link
+- **Data Embedding**: All three data sources (sprint stats, developer activity, daily activity) embedded at build time
+
 ## Notes
 
 - **Configuration**: All required environment variables must be set before running the tool
 - **Data Persistence**: All data is stored in SQLite database for fast access and reliability
 - **Vite SPA Recommended**: The new Vite SPA provides better maintainability and user experience
-- **Legacy Deprecation**: Legacy HTML generation (option 5a) is deprecated and will be removed
+- **Legacy Deprecation**: Legacy HTML generation (option 6a) is deprecated and will be removed
 - **Responsive Design**: Dashboards work on desktop, tablet, and mobile devices
 - **Offline Capability**: Both Vite SPA and legacy HTML work without internet connectivity
 - **Self-Contained Bundles**: All data is embedded at build time, no external API calls
@@ -330,17 +374,19 @@ sdm-tools/
 
 ### Dashboard Generation
 
-#### Vite SPA (Option 5b)
+#### Vite SPA (Option 6b)
 - If build fails, ensure JSON data files exist:
   - Run option 3 to generate sprint analytics (`ux/web/data/team_sprint_stats.json`)
   - Run option 4 to generate developer activity (`ux/web/data/developer_activity.json`)
+  - Run option 5 to generate daily activity report (`ux/web/data/daily_activity_report.json`)
+- Note: Daily activity dashboard will show "no data" message if `daily_activity_report.json` is missing
 - Verify Node.js and npm are installed (`node --version` should show 20.19+ or 22.12+)
 - Check that `reports-spa/` directory exists with `package.json`
 - Run `npm install` in the `reports-spa/` directory if dependencies are missing
 - Build output will be in `dist/reports/` directory
 
-#### Legacy HTML (Option 5a - Deprecated)
-- Ensure JSON data files exist (run options 3 and 4)
+#### Legacy HTML (Option 6a - Deprecated)
+- Ensure JSON data files exist (run options 3, 4, and 5)
 - Check that the `ux/web/` directory contains the HTML template files
 - Verify the `dist/` directory is writable
 - The tool automatically detects which JSON file to use based on the HTML filename
