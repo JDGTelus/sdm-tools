@@ -9,9 +9,6 @@ from .commits import (
     create_git_commits_table,
 )
 from .stats import (
-    generate_sprint_stats_json,
-    display_existing_sprint_stats,
-    generate_developer_activity_json,
     generate_daily_report_json,
     display_daily_report_summary,
 )
@@ -27,9 +24,6 @@ __all__ = [
     "display_commits",
     "store_commits_in_db",
     "create_git_commits_table",
-    "generate_sprint_stats_json",
-    "display_existing_sprint_stats",
-    "generate_developer_activity_json",
     "generate_daily_report_json",
     "display_daily_report_summary",
     "process_sprints_from_issues",
