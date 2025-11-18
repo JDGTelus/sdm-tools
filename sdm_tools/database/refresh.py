@@ -87,7 +87,7 @@ def refresh_database_workflow():
     Returns:
         Boolean indicating success
     """
-    from ..jira import fetch_issues_from_jira
+    from ..jira import fetch_issue_ids, fetch_issue_details
     from .issues import store_issues_in_db
     from .sprints import process_sprints_from_issues
     from .commits import update_git_commits
@@ -95,6 +95,10 @@ def refresh_database_workflow():
     console.print("\n[bold cyan]═══════════════════════════════════════════════[/bold cyan]")
     console.print("[bold cyan]    DATABASE REFRESH WORKFLOW[/bold cyan]")
     console.print("[bold cyan]═══════════════════════════════════════════════[/bold cyan]\n")
+    
+    # Store original DB_NAME for restoration in case of error
+    import sdm_tools.config as config
+    original_db_name = config.DB_NAME
     
     try:
         # Step 1: Backup existing database
@@ -110,28 +114,26 @@ def refresh_database_workflow():
             os.remove(temp_db)
         
         # Temporarily change DB_NAME to temp for fetching
-        import sdm_tools.config as config
-        original_db_name = config.DB_NAME
         config.DB_NAME = temp_db
-        
-        # Also update the global DB_NAME in other modules
-        from sdm_tools.database import core, issues, commits, sprints
-        core.DB_NAME = temp_db
-        issues.DB_NAME = temp_db
-        commits.DB_NAME = temp_db
-        sprints.DB_NAME = temp_db
         
         # Step 3: Fetch fresh Jira data
         console.print("\n[bold yellow]Step 3/6: Fetching fresh data from Jira...[/bold yellow]")
-        jira_issues = fetch_issues_from_jira()
+        issue_ids = fetch_issue_ids()
+        
+        if not issue_ids:
+            console.print("[bold red]Failed to fetch issue IDs from Jira. Aborting refresh.[/bold red]")
+            config.DB_NAME = original_db_name
+            return False
+        
+        jira_issues = fetch_issue_details(issue_ids)
         
         if not jira_issues:
-            console.print("[bold red]Failed to fetch Jira issues. Aborting refresh.[/bold red]")
+            console.print("[bold red]Failed to fetch issue details from Jira. Aborting refresh.[/bold red]")
             config.DB_NAME = original_db_name
             return False
         
         store_issues_in_db(jira_issues)
-        process_sprints_from_issues()
+        process_sprints_from_issues(silent=True)
         
         # Step 4: Fetch fresh Git data
         console.print("\n[bold yellow]Step 4/6: Fetching fresh data from Git...[/bold yellow]")
@@ -142,29 +144,25 @@ def refresh_database_workflow():
         
         # Restore original DB_NAME
         config.DB_NAME = original_db_name
-        core.DB_NAME = original_db_name
-        issues.DB_NAME = original_db_name
-        commits.DB_NAME = original_db_name
-        sprints.DB_NAME = original_db_name
         
         # Drop existing tables in production DB
-        if os.path.exists(DB_NAME):
-            conn = sqlite3.connect(DB_NAME)
+        if os.path.exists(original_db_name):
+            conn = sqlite3.connect(original_db_name)
             drop_all_tables(conn)
             conn.close()
         
         # Create fresh schema
-        conn = sqlite3.connect(DB_NAME)
+        conn = sqlite3.connect(original_db_name)
         create_normalized_schema(conn)
         conn.close()
         
         # Run normalization from temp to production
-        stats = normalize_all_data(temp_db, DB_NAME)
+        stats = normalize_all_data(temp_db, original_db_name)
         
         # Step 6: Display final statistics
         console.print("\n[bold yellow]Step 6/6: Generating final statistics...[/bold yellow]")
         
-        conn = sqlite3.connect(DB_NAME)
+        conn = sqlite3.connect(original_db_name)
         table_stats = get_table_stats(conn)
         conn.close()
         
@@ -197,11 +195,7 @@ def refresh_database_workflow():
         traceback.print_exc()
         
         # Restore DB_NAME
-        try:
-            import sdm_tools.config as config
-            config.DB_NAME = original_db_name
-        except:
-            pass
+        config.DB_NAME = original_db_name
         
         return False
 

@@ -5,7 +5,7 @@ import sqlite3
 from rich.console import Console
 from .core import execute_sql, backup_table
 from .issues import display_table_data, fetch_earliest_ticket_date
-from ..config import DB_NAME
+from .. import config
 from ..repo import fetch_git_commits_since
 
 console = Console()
@@ -13,13 +13,13 @@ console = Console()
 
 def update_git_commits():
     """Updates the git_commits table with commits since the earliest Jira ticket date."""
-    if not os.path.exists(DB_NAME):
+    if not os.path.exists(config.DB_NAME):
         console.print(
             "[bold red]Database does not exist. Please run option 1 to update issues from Jira first.[/bold red]"
         )
         input("Press Enter to return to the menu...")
         return
-    with sqlite3.connect(DB_NAME) as conn:
+    with sqlite3.connect(config.DB_NAME) as conn:
         cursor = conn.cursor()
         # Check if the issues table exists
         from ..config import TABLE_NAME
@@ -54,7 +54,7 @@ def update_git_commits():
 
 def store_commits_in_db(commits):
     """Stores commit information in the SQLite3 database."""
-    with sqlite3.connect(DB_NAME) as conn:
+    with sqlite3.connect(config.DB_NAME) as conn:
         if execute_sql(
             conn,
             "SELECT name FROM sqlite_master WHERE type='table' AND name='git_commits'",
@@ -99,14 +99,14 @@ def create_git_commits_table(conn):
 
 def display_commits():
     """Displays commit information from the git_commits table."""
-    if not os.path.exists(DB_NAME):
+    if not os.path.exists(config.DB_NAME):
         console.print(
             "[bold red]Database does not exist. Please update commits first.[/bold red]"
         )
         input("Press Enter to return to the menu...")
         return
 
-    with sqlite3.connect(DB_NAME) as conn:
+    with sqlite3.connect(config.DB_NAME) as conn:
         cursor = conn.cursor()
         # Check if the table exists
         cursor.execute(

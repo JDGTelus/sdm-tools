@@ -16,11 +16,241 @@ from .database import (
 from .config import DB_NAME, TABLE_NAME
 
 
+# ============================================================================
+# NEW PHASE 2/3 HANDLERS - Normalized Database Functions
+# ============================================================================
+
+def handle_refresh_all_data():
+    """Handle the complete data refresh workflow."""
+    from .database import refresh_database_workflow
+    
+    console.print("\n[bold yellow]⚠️  WARNING: This will refresh ALL data from Jira and Git[/bold yellow]")
+    console.print("[bold yellow]   - Current database will be backed up[/bold yellow]")
+    console.print("[bold yellow]   - Fresh data will be fetched and normalized[/bold yellow]")
+    console.print("[bold yellow]   - This may take several minutes[/bold yellow]\n")
+    
+    confirm = console.input("[bold red]Continue? (yes/N): [/bold red]").strip().lower()
+    
+    if confirm != "yes":
+        console.print("[bold cyan]Refresh cancelled.[/bold cyan]")
+        input("Press Enter to return to the menu...")
+        return
+    
+    # Run the refresh workflow
+    success = refresh_database_workflow()
+    
+    if success:
+        console.print("\n[bold green]✓ Data refresh completed successfully![/bold green]")
+    else:
+        console.print("\n[bold red]✗ Data refresh failed. Check errors above.[/bold red]")
+    
+    input("\nPress Enter to return to the menu...")
+
+
+def handle_view_sprints():
+    """Display available sprints from the database."""
+    from .database import get_available_sprints
+    from rich.table import Table
+    
+    console.print("\n[bold cyan]═══════════════════════════════════════════════[/bold cyan]")
+    console.print("[bold cyan]           AVAILABLE SPRINTS[/bold cyan]")
+    console.print("[bold cyan]═══════════════════════════════════════════════[/bold cyan]\n")
+    
+    sprints = get_available_sprints()
+    
+    if not sprints:
+        console.print("[bold yellow]No sprints found. Please refresh data first.[/bold yellow]")
+        input("\nPress Enter to return to the menu...")
+        return
+    
+    # Create Rich table
+    table = Table(show_header=True, header_style="bold cyan", border_style="cyan")
+    table.add_column("ID", style="dim", width=8)
+    table.add_column("Name", style="bold white", width=35)
+    table.add_column("State", justify="center", width=10)
+    table.add_column("Start Date", justify="center", width=12)
+    table.add_column("End Date", justify="center", width=12)
+    
+    for sprint_id, name, state, start_date, end_date in sprints:
+        # Color code by state
+        if state == "active":
+            state_colored = f"[bold green]{state}[/bold green]"
+        elif state == "closed":
+            state_colored = f"[dim]{state}[/dim]"
+        else:
+            state_colored = state
+        
+        table.add_row(
+            str(sprint_id),
+            name,
+            state_colored,
+            start_date or "N/A",
+            end_date or "N/A"
+        )
+    
+    console.print(table)
+    console.print(f"\n[bold]Total sprints: {len(sprints)}[/bold]")
+    
+    input("\nPress Enter to return to the menu...")
+
+
+def handle_view_developers():
+    """Display active developers from the database."""
+    from .database import get_active_developers
+    from rich.table import Table
+    
+    console.print("\n[bold cyan]═══════════════════════════════════════════════[/bold cyan]")
+    console.print("[bold cyan]           ACTIVE DEVELOPERS[/bold cyan]")
+    console.print("[bold cyan]═══════════════════════════════════════════════[/bold cyan]\n")
+    
+    developers = get_active_developers()
+    
+    if not developers:
+        console.print("[bold yellow]No active developers found. Please refresh data first.[/bold yellow]")
+        input("\nPress Enter to return to the menu...")
+        return
+    
+    # Create Rich table
+    table = Table(show_header=True, header_style="bold cyan", border_style="cyan")
+    table.add_column("ID", style="dim", width=6)
+    table.add_column("Name", style="bold white", width=35)
+    table.add_column("Email", style="cyan", width=40)
+    
+    for dev_id, name, email in developers:
+        table.add_row(str(dev_id), name, email)
+    
+    console.print(table)
+    console.print(f"\n[bold]Total active developers: {len(developers)}[/bold]")
+    console.print(f"[dim]Note: Active developers are those in INCLUDED_EMAILS configuration[/dim]")
+    
+    input("\nPress Enter to return to the menu...")
+
+
+def handle_generate_reports():
+    """Handle report generation submenu."""
+    from .database.reports import (
+        generate_daily_report_json,
+        generate_sprint_report_json,
+    )
+    from .database import get_available_sprints
+    from datetime import datetime, date
+    
+    while True:
+        clear_screen()
+        print_banner()
+        
+        console.print("[bold yellow]Generate Activity Report:[/bold yellow]\n")
+        console.print("[bold cyan]1. Single day report (default: today)[/bold cyan]")
+        console.print("[bold cyan]2. Full sprint report[/bold cyan]")
+        console.print("[bold cyan]3. Back to main menu[/bold cyan]")
+        
+        choice = console.input("\n[bold green]Enter your choice (1/2/3): [/bold green]").strip()
+        
+        if choice == "1":
+            # Single day report
+            date_input = console.input(
+                "\n[bold yellow]Enter date (YYYY-MM-DD) or press Enter for today: [/bold yellow]"
+            ).strip()
+            
+            if date_input:
+                try:
+                    target_date = datetime.strptime(date_input, "%Y-%m-%d").date()
+                except ValueError:
+                    console.print("[bold red]Invalid date format. Using today instead.[/bold red]")
+                    target_date = None
+            else:
+                target_date = None
+            
+            # Generate report
+            output = generate_daily_report_json(target_date)
+            
+            if output:
+                console.print(f"\n[bold green]✓ Daily report ready![/bold green]")
+                console.print(f"[dim]Open ux/web/daily-activity-dashboard.html to view[/dim]")
+            
+            input("\nPress Enter to continue...")
+            
+        elif choice == "2":
+            # Sprint report
+            sprints = get_available_sprints()
+            
+            if not sprints:
+                console.print("\n[bold yellow]No sprints found. Please refresh data first.[/bold yellow]")
+                input("\nPress Enter to continue...")
+                continue
+            
+            # Show recent sprints
+            console.print("\n[bold]Recent sprints:[/bold]")
+            for i, (sprint_id, name, state, start, end) in enumerate(sprints[:5], 1):
+                state_icon = "🟢" if state == "active" else "⚪"
+                console.print(f"  {state_icon} {sprint_id}: {name} ({state})")
+            
+            sprint_input = console.input(
+                "\n[bold yellow]Enter sprint ID: [/bold yellow]"
+            ).strip()
+            
+            try:
+                sprint_id = int(sprint_input)
+                output = generate_sprint_report_json(sprint_id)
+                
+                if output:
+                    console.print(f"\n[bold green]✓ Sprint report generated![/bold green]")
+                    console.print(f"[dim]File: {output}[/dim]")
+            except ValueError:
+                console.print("[bold red]Invalid sprint ID.[/bold red]")
+            
+            input("\nPress Enter to continue...")
+            
+        elif choice == "3":
+            break
+        else:
+            console.print("[bold red]Invalid choice.[/bold red]")
+            input("\nPress Enter to continue...")
+
+
+def manage_issues_new():
+    """Updated main menu with normalized database support."""
+    while True:
+        clear_screen()
+        print_banner()
+
+        console.print("[bold yellow]Choose an option:[/bold yellow]\n")
+        console.print("[bold cyan]1. Refresh All Data (Jira + Git → Normalize)[/bold cyan]")
+        console.print("[bold cyan]2. Generate Activity Reports[/bold cyan]")
+        console.print("[bold cyan]3. View Sprints[/bold cyan]")
+        console.print("[bold cyan]4. View Active Developers[/bold cyan]")
+        console.print("[bold cyan]5. Exit[/bold cyan]")
+
+        choice = console.input(
+            "\n[bold green]Enter your choice (1/2/3/4/5): [/bold green]"
+        )
+
+        if choice == "1":
+            handle_refresh_all_data()
+        elif choice == "2":
+            handle_generate_reports()
+        elif choice == "3":
+            handle_view_sprints()
+        elif choice == "4":
+            handle_view_developers()
+        elif choice == "5":
+            console.print("[bold red]Exiting SDM Tools.[/bold red]")
+            break
+        else:
+            console.print("[bold red]Invalid choice. Please try again.[/bold red]")
+            input("Press Enter to return to the menu...")
+
+
+# ============================================================================
+# CLI ENTRY POINT
+# ============================================================================
+
 @click.group(invoke_without_command=True)
 @click.pass_context
 def cli(ctx):
     """SDM Tools: Manage your team's Jira tasks with style!"""
-    manage_issues()
+    # Use new normalized database menu
+    manage_issues_new()
 
 
 def has_issues_data():
@@ -63,6 +293,8 @@ def has_commits_data():
 
 def handle_issues_option():
     """Handle the unified issues option (get/update/display)."""
+    from .database.sprints import process_sprints_from_issues
+    
     if has_issues_data():
         # Data exists, ask if user wants to update
         update_choice = (
@@ -80,6 +312,8 @@ def handle_issues_option():
                 issues = fetch_issue_details(issue_ids)
                 if issues:
                     store_issues_in_db(issues)
+                    # Process sprints after storing issues
+                    process_sprints_from_issues(silent=False)
                     console.print(
                         "[bold green]Issues updated from Jira and stored in the database.[/bold green]"
                     )
@@ -107,6 +341,8 @@ def handle_issues_option():
             issues = fetch_issue_details(issue_ids)
             if issues:
                 store_issues_in_db(issues)
+                # Process sprints after storing issues
+                process_sprints_from_issues(silent=False)
                 console.print(
                     "[bold green]Issues updated from Jira and stored in the database.[/bold green]"
                 )

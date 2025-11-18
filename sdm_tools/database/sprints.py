@@ -4,7 +4,8 @@ import json
 import sqlite3
 from rich.console import Console
 from .core import execute_sql, backup_table, create_table
-from ..config import DB_NAME, TABLE_NAME
+from .. import config
+from ..config import TABLE_NAME
 
 console = Console()
 
@@ -13,7 +14,7 @@ def extract_sprint_data_from_issues():
     """Extract unique sprint data from the customfield_10020 field in issues table."""
     sprints = {}
 
-    with sqlite3.connect(DB_NAME) as conn:
+    with sqlite3.connect(config.DB_NAME) as conn:
         # Check if the issues table exists
         cursor = execute_sql(
             conn,
@@ -85,17 +86,23 @@ def extract_sprint_data_from_issues():
     return sprints
 
 
-def create_sprints_table(sprints_data):
-    """Create and populate the sprints table with unique sprint data."""
+def create_sprints_table(sprints_data, silent=False):
+    """Create and populate the sprints table with unique sprint data.
+    
+    Args:
+        sprints_data: Dictionary of sprint data
+        silent: If True, suppress console output
+    """
     if not sprints_data:
-        console.print(
-            "[bold yellow]No sprint data found to create table.[/bold yellow]"
-        )
+        if not silent:
+            console.print(
+                "[bold yellow]No sprint data found to create table.[/bold yellow]"
+            )
         return False
 
     sprint_table_name = f"{TABLE_NAME}_sprints"
 
-    with sqlite3.connect(DB_NAME) as conn:
+    with sqlite3.connect(config.DB_NAME) as conn:
         # Check if sprints table already exists and back it up
         cursor = execute_sql(
             conn,
@@ -134,9 +141,10 @@ def create_sprints_table(sprints_data):
                 values,
             )
 
-    console.print(
-        f"[bold green]Created sprints table '{sprint_table_name}' with {len(sprints_data)} unique sprints.[/bold green]"
-    )
+    if not silent:
+        console.print(
+            f"[bold green]Created sprints table '{sprint_table_name}' with {len(sprints_data)} unique sprints.[/bold green]"
+        )
     return True
 
 
@@ -144,7 +152,7 @@ def display_sprints_table():
     """Display the sprints table data."""
     sprint_table_name = f"{TABLE_NAME}_sprints"
 
-    with sqlite3.connect(DB_NAME) as conn:
+    with sqlite3.connect(config.DB_NAME) as conn:
         # Check if sprints table exists
         cursor = execute_sql(
             conn,
@@ -177,23 +185,30 @@ def display_sprints_table():
         display_table_data(conn, sprint_table_name, display_columns)
 
 
-def process_sprints_from_issues():
-    """Main function to extract and store sprint data from issues."""
-    console.print("[bold yellow]Extracting sprint data from issues...[/bold yellow]")
+def process_sprints_from_issues(silent=False):
+    """Main function to extract and store sprint data from issues.
+    
+    Args:
+        silent: If True, suppress user prompts (for automated workflows)
+    """
+    if not silent:
+        console.print("[bold yellow]Extracting sprint data from issues...[/bold yellow]")
 
     # Extract sprint data
     sprints_data = extract_sprint_data_from_issues()
 
     if not sprints_data:
-        console.print("[bold red]No sprint data found in issues.[/bold red]")
+        if not silent:
+            console.print("[bold red]No sprint data found in issues.[/bold red]")
         return False
 
-    console.print(f"[bold cyan]Found {len(sprints_data)} unique sprints.[/bold cyan]")
+    if not silent:
+        console.print(f"[bold cyan]Found {len(sprints_data)} unique sprints.[/bold cyan]")
 
     # Create sprints table
-    success = create_sprints_table(sprints_data)
+    success = create_sprints_table(sprints_data, silent=silent)
 
-    if success:
+    if success and not silent:
         console.print(
             "[bold green]Sprint data processing completed successfully.[/bold green]"
         )

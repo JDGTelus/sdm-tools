@@ -6,14 +6,15 @@ import sqlite3
 from rich.console import Console
 from rich.table import Table
 from .core import execute_sql, backup_table, create_table
-from ..config import DB_NAME, TABLE_NAME, DISPLAY_COLUMNS
+from .. import config
+from ..config import TABLE_NAME, DISPLAY_COLUMNS
 
 console = Console()
 
 
 def store_issues_in_db(issues):
     """Stores issues in the SQLite3 database."""
-    with sqlite3.connect(DB_NAME) as conn:
+    with sqlite3.connect(config.DB_NAME) as conn:
         if execute_sql(
             conn,
             f"SELECT name FROM sqlite_master WHERE type='table' AND name='{TABLE_NAME}'",
@@ -37,12 +38,6 @@ def store_issues_in_db(issues):
                 values,
             )
 
-    # After storing issues, automatically process sprint data
-    console.print("[bold cyan]Processing sprint data from issues...[/bold cyan]")
-    from .sprints import process_sprints_from_issues
-
-    process_sprints_from_issues()
-
 
 def display_table_data(conn, table_name, columns):
     """Displays data from a specified table in a formatted table."""
@@ -60,13 +55,13 @@ def display_table_data(conn, table_name, columns):
 
 def display_issues():
     """Displays issues in a table format."""
-    if not os.path.exists(DB_NAME):
+    if not os.path.exists(config.DB_NAME):
         console.print(
             "[bold red]Database does not exist. Please update issues from Jira first.[/bold red]"
         )
         input("Press Enter to return to the menu...")
         return
-    with sqlite3.connect(DB_NAME) as conn:
+    with sqlite3.connect(config.DB_NAME) as conn:
         cursor = conn.cursor()
         # Check if the table exists
         cursor.execute(
@@ -94,7 +89,7 @@ def display_issues():
 
 def fetch_earliest_ticket_date():
     """Fetches the creation date of the earliest Jira ticket from the database."""
-    with sqlite3.connect(DB_NAME) as conn:
+    with sqlite3.connect(config.DB_NAME) as conn:
         earliest_date = execute_sql(
             conn, f"SELECT MIN(created) FROM {TABLE_NAME}"
         ).fetchone()[0]
