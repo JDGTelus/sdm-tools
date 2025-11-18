@@ -13,6 +13,20 @@ from .stats import (
     display_daily_report_summary,
 )
 from .sprints import process_sprints_from_issues, display_sprints_table
+from .schema import create_normalized_schema, drop_all_tables, get_table_stats
+from .normalize import normalize_all_data
+from .refresh import (
+    refresh_database_workflow,
+    backup_database,
+    get_available_sprints,
+    get_active_developers,
+)
+from .reports import (
+    query_daily_activity,
+    query_sprint_activity,
+    query_date_range_activity,
+    generate_sprint_report_json,
+)
 
 __all__ = [
     "execute_sql",
@@ -28,4 +42,17 @@ __all__ = [
     "display_daily_report_summary",
     "process_sprints_from_issues",
     "display_sprints_table",
+    # New normalized database functions
+    "create_normalized_schema",
+    "drop_all_tables",
+    "get_table_stats",
+    "normalize_all_data",
+    "refresh_database_workflow",
+    "backup_database",
+    "get_available_sprints",
+    "get_active_developers",
+    "query_daily_activity",
+    "query_sprint_activity",
+    "query_date_range_activity",
+    "generate_sprint_report_json",
 ]
