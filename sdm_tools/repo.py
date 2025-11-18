@@ -24,7 +24,7 @@ def fetch_git_commits_since(date):
     try:
         commits = (
             subprocess.check_output(
-                ["git", "log", f"--since={date}", "--pretty=format:%H|%an|%ae|%ad|%s"]
+                ["git", "log", "--all", f"--since={date}", "--pretty=format:%H|%an|%ae|%ad|%s"]
             )
             .decode("utf-8")
             .split("\n")

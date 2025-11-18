@@ -6,7 +6,9 @@ SDM-Tools is a command-line interface (CLI) tool designed for Software Developer
 
 ### Core Functionality
 - **Jira Integration**: Fetch and store Jira issues with customizable JQL queries
-- **Commit Tracking**: Fetch and store commit information from local git repositories
+- **Commit Tracking**: Fetch and store commit information from ALL branches in local git repositories
+- **Comprehensive Coverage**: Captures commits from feature branches, remote branches, and all refs
+- **Normalized Database**: Efficient schema with email auto-mapping and sprint-based filtering
 - **Data Persistence**: SQLite database for fast access and reliability
 - **Pagination**: Display large datasets with colorful, paginated output
 
@@ -125,7 +127,8 @@ The CLI provides the following options:
    - Display issues with customizable columns and pagination
 
 2. **Manage git commits (get/update/display)**
-   - Fetch commit information from the local repository
+   - Fetch commit information from ALL branches in the local repository
+   - Captures commits from feature branches, remote branches, and all refs
    - Update commit data since the earliest Jira ticket date
    - Display commits with author information and pagination
 
@@ -238,6 +241,7 @@ sdm-tools/
 - **Timezone Awareness**: Activity buckets respect configured timezone for accurate tracking
 - **Offline Capable**: The HTML dashboard works without internet connectivity
 - **Self-Contained Report**: All data is embedded at generation time, no external API calls
+- **Complete Commit Tracking**: Uses `git log --all` to capture commits from all branches, including feature branches that may not be merged yet. This ensures comprehensive developer activity tracking.
 
 ## Troubleshooting
 
