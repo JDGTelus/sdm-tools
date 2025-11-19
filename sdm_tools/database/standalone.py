@@ -119,8 +119,8 @@ def _inline_css(html_content, css_content):
 
 def _inline_json_data(html_content, data_dir):
     """Detect fetch() calls and inline JSON data."""
-    # Pattern to match: fetch("./data/FILENAME.json")
-    fetch_pattern = r'fetch\("\.\/data\/([^"]+\.json)"\)'
+    # Pattern to match: fetch("./data/FILENAME.json") or fetch('./data/FILENAME.json')
+    fetch_pattern = r'fetch\(["\']\.\/data\/([^"\']+\.json)["\']\)'
     
     # Find all JSON files being fetched
     matches = list(re.finditer(fetch_pattern, html_content))
@@ -138,22 +138,39 @@ def _inline_json_data(html_content, data_dir):
             json_str = json.dumps(json_data)
             
             # Pattern to replace the entire fetch().then().then() chain
-            # Match: fetch("./data/FILE.json")\n.then((res) => res.json())\n.then((reportData) => {
-            # Replace with: Promise.resolve(DATA).then((reportData) => {
+            # Handles multiple variations:
+            # 1. Simple: fetch(...).then((res) => res.json()).then((data) => {
+            # 2. With error check: fetch(...).then((res) => { if (!res.ok) ...; return res.json(); }).then((data) => {
             
-            # Build pattern that handles newlines and whitespace
-            old_pattern = (
-                rf'fetch\("\.\/data\/{re.escape(json_filename)}"\)\s*'
-                r'\.then\(\s*\([^)]+\)\s*=>\s*[^)]+\.json\(\)\s*\)\s*'
+            # First try the complex pattern (with error checking)
+            complex_pattern = (
+                rf'fetch\(["\']\.\/data\/{re.escape(json_filename)}["\']\)\s*'
+                r'\.then\(\s*\(([^)]+)\)\s*=>\s*\{[^}]*?return\s+\1\.json\(\);?\s*\}\s*\)\s*'
                 r'\.then\(\s*\((\w+)\)\s*=>\s*\{'
             )
             
-            new_code = (
-                f'/* Inlined data from ./data/{json_filename} */\n          '
-                f'Promise.resolve({json_str})\n            .then((\\1) => {{'
-            )
+            # Try complex pattern first
+            match = re.search(complex_pattern, html_content, re.MULTILINE | re.DOTALL)
             
-            html_content = re.sub(old_pattern, new_code, html_content, count=1, flags=re.MULTILINE | re.DOTALL)
+            if match:
+                # Complex pattern matched
+                new_code = (
+                    f'/* Inlined data from ./data/{json_filename} */\n          '
+                    f'Promise.resolve({json_str})\n            .then(({match.group(2)}) => {{'
+                )
+                html_content = re.sub(complex_pattern, new_code, html_content, count=1, flags=re.MULTILINE | re.DOTALL)
+            else:
+                # Try simple pattern
+                simple_pattern = (
+                    rf'fetch\(["\']\.\/data\/{re.escape(json_filename)}["\']\)\s*'
+                    r'\.then\(\s*\([^)]+\)\s*=>\s*[^.]+\.json\(\)\s*\)\s*'
+                    r'\.then\(\s*\((\w+)\)\s*=>\s*\{'
+                )
+                new_code = (
+                    f'/* Inlined data from ./data/{json_filename} */\n          '
+                    f'Promise.resolve({json_str})\n            .then((\\1) => {{'
+                )
+                html_content = re.sub(simple_pattern, new_code, html_content, count=1, flags=re.MULTILINE | re.DOTALL)
             
             console.print(f"[dim]    → Inlined: {json_filename} ({len(json_str)} bytes)[/dim]")
         else:
@@ -237,6 +254,9 @@ def _discover_standalone_reports():
         if 'daily' in html_file.name.lower() or report_type == 'daily':
             icon = '📅'
             view_name = 'daily'
+        elif 'velocity' in html_file.name.lower() or report_type == 'sprint_velocity':
+            icon = '📈'
+            view_name = 'velocity'
         elif 'sprint' in html_file.name.lower() or report_type in ['multi_sprint', 'sprint']:
             icon = '📊'
             view_name = 'sprint'

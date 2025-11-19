@@ -58,7 +58,7 @@
           const avgPlanned = data.metadata.avg_planned_per_sprint;
           const avgDelivered = data.metadata.avg_delivered_per_sprint;
           
-          // Calculate dynamic Y-axis range to center data at ~1/3 height
+          // Calculate dynamic Y-axis range to center data in middle
           const allPoints = [
             ...plannedPoints, 
             ...deliveredPoints,
@@ -69,16 +69,16 @@
           const minPoint = Math.min(...allPoints);
           const dataRange = maxPoint - minPoint;
           
-          // Data should occupy 33% of chart height (1/3)
-          // So total range should be 3x the data range
-          const totalRange = dataRange * 3;
+          // Add padding above and below data (40% padding on each side)
+          // This keeps lines centered in the middle of the chart
+          const padding = dataRange * 0.8;
           
-          // Calculate midpoint between avg planned and avg delivered
-          const avgMidpoint = (avgPlanned + avgDelivered) / 2;
+          // Center the range around the middle of the data
+          const dataMidpoint = (maxPoint + minPoint) / 2;
           
-          // Set range centered on avgMidpoint
-          const suggestedMin = Math.max(0, Math.floor(avgMidpoint - (totalRange / 2)));
-          const suggestedMax = Math.ceil(avgMidpoint + (totalRange / 2));
+          // Set range with padding
+          const suggestedMin = Math.max(0, Math.floor(dataMidpoint - (dataRange / 2) - padding));
+          const suggestedMax = Math.ceil(dataMidpoint + (dataRange / 2) + padding);
           
           chartInstance.current = new Chart(ctx, {
             type: 'line',
@@ -90,10 +90,10 @@
                   data: plannedPoints,
                   borderColor: PLANNED_COLOR,
                   backgroundColor: 'rgba(75, 0, 130, 0.1)',
-                  borderWidth: 3,
+                  borderWidth: 2,
                   tension: 0.3,
-                  pointRadius: 5,
-                  pointHoverRadius: 7,
+                  pointRadius: 4,
+                  pointHoverRadius: 6,
                   pointBackgroundColor: PLANNED_COLOR,
                   fill: false
                 },
@@ -102,10 +102,10 @@
                   data: deliveredPoints,
                   borderColor: DELIVERED_COLOR,
                   backgroundColor: 'rgba(102, 204, 0, 0.1)',
-                  borderWidth: 3,
+                  borderWidth: 2,
                   tension: 0.3,
-                  pointRadius: 5,
-                  pointHoverRadius: 7,
+                  pointRadius: 4,
+                  pointHoverRadius: 6,
                   pointBackgroundColor: DELIVERED_COLOR,
                   fill: false
                 },
@@ -114,22 +114,22 @@
                   data: Array(labels.length).fill(avgPlanned),
                   borderColor: PLANNED_COLOR,
                   backgroundColor: 'transparent',
-                  borderWidth: 2,
+                  borderWidth: 1.5,
                   borderDash: [10, 5],
                   tension: 0,
                   pointRadius: 0,
-                  pointHoverRadius: 3
+                  pointHoverRadius: 2
                 },
                 {
                   label: `Avg Delivered (${avgDelivered} pts)`,
                   data: Array(labels.length).fill(avgDelivered),
                   borderColor: DELIVERED_COLOR,
                   backgroundColor: 'transparent',
-                  borderWidth: 2,
+                  borderWidth: 1.5,
                   borderDash: [10, 5],
                   tension: 0,
                   pointRadius: 0,
-                  pointHoverRadius: 3
+                  pointHoverRadius: 2
                 }
               ]
             },
