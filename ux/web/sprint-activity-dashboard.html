@@ -25,6 +25,58 @@
       };
     </script>
     <link rel="stylesheet" href="shared-dashboard-styles.css" />
+    <style>
+      /* Custom tooltip styles */
+      .chart-tooltip {
+        position: absolute;
+        background: rgba(0, 0, 0, 0.9);
+        color: white;
+        padding: 12px 16px;
+        border-radius: 8px;
+        font-family: system-ui, -apple-system, sans-serif;
+        font-size: 13px;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+        max-height: 400px;
+        overflow-y: auto;
+        min-width: 220px;
+        pointer-events: none;
+        z-index: 1000;
+        display: none;
+      }
+
+      .tooltip-header {
+        font-weight: bold;
+        font-size: 14px;
+        margin-bottom: 8px;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+        padding-bottom: 6px;
+      }
+
+      .tooltip-row {
+        display: flex;
+        justify-content: space-between;
+        padding: 3px 0;
+        font-size: 12px;
+      }
+
+      .sprint-name {
+        font-weight: 500;
+      }
+
+      .sprint-data {
+        font-family: monospace;
+        margin-left: 12px;
+      }
+
+      .tooltip-total {
+        font-weight: bold;
+        text-align: right;
+        margin-top: 8px;
+        padding-top: 8px;
+        border-top: 1px solid rgba(255, 255, 255, 0.2);
+        font-size: 13px;
+      }
+    </style>
   </head>
   <body class="bg-gray-50">
     <div id="root"></div>
@@ -42,14 +94,58 @@
         '#1ABC9C',  // Teal
       ];
 
-      // Line Chart Component
-      const LineChart = ({ data, title }) => {
+      // Line Chart Component with Enhanced Tooltip
+      const LineChart = ({ data, title, metricType, fullSprintData }) => {
         const chartRef = useRef(null);
         const chartInstance = useRef(null);
+        const tooltipRef = useRef(null);
 
         useEffect(() => {
-          if (!chartRef.current || !data) return;
+          if (!chartRef.current || !data || !fullSprintData) return;
           if (chartInstance.current) chartInstance.current.destroy();
+
+          // Create tooltip element if it doesn't exist
+          if (!tooltipRef.current) {
+            tooltipRef.current = document.createElement('div');
+            tooltipRef.current.className = 'chart-tooltip';
+            document.body.appendChild(tooltipRef.current);
+          }
+
+          const buildDeveloperTooltip = (developerName, sprintData, metric) => {
+            // Find developer's data across all sprints
+            const devData = sprintData.sprints.map(sprint => {
+              const dev = sprint.developer_summary.find(d => d.name === developerName);
+              if (!dev) return null;
+              
+              return {
+                sprintName: sprint.sprint.name.replace('DevicesTITAN_', ''),
+                jira: dev.sprint_jira,
+                git: dev.sprint_git,
+                total: dev.sprint_total
+              };
+            }).filter(Boolean);
+            
+            // Calculate total
+            const total = devData.reduce((sum, d) => sum + d[metric], 0);
+            
+            // Build HTML
+            let html = `<div class="tooltip-header">${developerName}</div>`;
+            
+            devData.forEach(d => {
+              const value = metric === 'total' ? d.total : (metric === 'jira' ? d.jira : d.git);
+              const extra = metric === 'total' ? ` (J:${d.jira}, R:${d.git})` : '';
+              html += `
+                <div class="tooltip-row">
+                  <span class="sprint-name">${d.sprintName}:</span>
+                  <span class="sprint-data">${value}${extra}</span>
+                </div>
+              `;
+            });
+            
+            html += `<div class="tooltip-total">Total: ${total} actions</div>`;
+            
+            return html;
+          };
 
           const ctx = chartRef.current.getContext("2d");
           chartInstance.current = new Chart(ctx, {
@@ -62,9 +158,8 @@
               responsive: true,
               maintainAspectRatio: false,
               interaction: {
-                mode: 'nearest',
-                intersect: false,
-                axis: 'x'
+                mode: 'dataset',
+                intersect: false
               },
               plugins: {
                 legend: {
@@ -83,18 +178,30 @@
                   color: '#1f2937'
                 },
                 tooltip: {
-                  backgroundColor: 'rgba(0, 0, 0, 0.8)',
-                  padding: 12,
-                  titleFont: { size: 14, weight: 'bold' },
-                  bodyFont: { size: 13 },
-                  callbacks: {
-                    title: (tooltipItems) => {
-                      return tooltipItems[0].label;
-                    },
-                    label: (context) => {
-                      const developerName = context.dataset.label;
-                      const value = context.parsed.y;
-                      return `${developerName}: ${value} actions`;
+                  enabled: false,
+                  external: (context) => {
+                    const tooltipEl = tooltipRef.current;
+                    const tooltipModel = context.tooltip;
+                    
+                    if (tooltipModel.opacity === 0) {
+                      tooltipEl.style.display = 'none';
+                      return;
+                    }
+                    
+                    if (tooltipModel.dataPoints && tooltipModel.dataPoints.length > 0) {
+                      const datasetIndex = tooltipModel.dataPoints[0].datasetIndex;
+                      const developer = data.datasets[datasetIndex];
+                      
+                      tooltipEl.innerHTML = buildDeveloperTooltip(
+                        developer.label,
+                        fullSprintData,
+                        metricType
+                      );
+                      
+                      const position = context.chart.canvas.getBoundingClientRect();
+                      tooltipEl.style.display = 'block';
+                      tooltipEl.style.left = position.left + window.pageXOffset + tooltipModel.caretX + 'px';
+                      tooltipEl.style.top = position.top + window.pageYOffset + tooltipModel.caretY + 'px';
                     }
                   }
                 }
@@ -136,17 +243,11 @@
                       dataset.borderWidth = 4;
                       dataset.pointRadius = 6;
                     } else {
-                      dataset.borderWidth = 1;
-                      dataset.pointRadius = 3;
+                      dataset.borderWidth = 2;  // Fixed: stay at normal width
+                      dataset.pointRadius = 4;
                     }
                   });
                   
-                  chart.update('none');
-                } else {
-                  chart.data.datasets.forEach(dataset => {
-                    dataset.borderWidth = 2;
-                    dataset.pointRadius = 4;
-                  });
                   chart.update('none');
                 }
               }
@@ -155,23 +256,45 @@
 
           return () => {
             if (chartInstance.current) chartInstance.current.destroy();
+            if (tooltipRef.current) {
+              tooltipRef.current.style.display = 'none';
+            }
           };
-        }, [data, title]);
+        }, [data, title, metricType, fullSprintData]);
 
         return <canvas ref={chartRef} className="w-full" style={{ height: '400px' }}></canvas>;
       };
 
-      // Sprint Activity Table Component (Heatmap style)
+      // Sprint Activity Table Component (Heatmap style) with Updated Colors
       const SprintActivityTable = ({ tableData }) => {
         if (!tableData) return null;
 
         const getActivityColor = (total) => {
-          if (total === 0) return 'bg-gray-50 text-gray-400';
-          if (total >= 50) return 'bg-red-400 text-white font-bold';
-          if (total >= 30) return 'bg-orange-300 text-gray-900 font-semibold';
-          if (total >= 15) return 'bg-yellow-200 text-gray-900';
-          if (total >= 5) return 'bg-green-200 text-gray-900';
-          return 'bg-blue-100 text-gray-900';
+          // Using transparent blues, greens, and yellows only
+          if (total === 0) return { 
+            className: 'text-gray-400', 
+            style: { backgroundColor: 'rgba(249, 250, 251, 0.5)' } 
+          };
+          if (total >= 50) return { 
+            className: 'text-gray-900', 
+            style: { backgroundColor: 'rgba(134, 239, 172, 0.4)' }  // Green (top)
+          };
+          if (total >= 30) return { 
+            className: 'text-gray-900', 
+            style: { backgroundColor: 'rgba(187, 247, 208, 0.35)' }  // Green (upper)
+          };
+          if (total >= 15) return { 
+            className: 'text-gray-900', 
+            style: { backgroundColor: 'rgba(254, 249, 195, 0.5)' }  // Yellow (middle)
+          };
+          if (total >= 5) return { 
+            className: 'text-gray-900', 
+            style: { backgroundColor: 'rgba(191, 219, 254, 0.4)' }  // Blue (lower)
+          };
+          return { 
+            className: 'text-gray-700', 
+            style: { backgroundColor: 'rgba(219, 234, 254, 0.3)' }  // Blue (bottom)
+          };
         };
 
         return (
@@ -207,8 +330,13 @@
                       </td>
                       {tableData.sprints.map((sprint) => {
                         const sprintData = dev.sprintData[sprint.id] || { total: 0, jira: 0, git: 0 };
+                        const colorData = getActivityColor(sprintData.total);
                         return (
-                          <td key={sprint.id} className={`px-2 py-2 text-center ${getActivityColor(sprintData.total)}`}>
+                          <td 
+                            key={sprint.id} 
+                            className={`px-2 py-2 text-center ${colorData.className}`}
+                            style={colorData.style}
+                          >
                             <div className="text-sm font-bold">{sprintData.total || '-'}</div>
                             {sprintData.total > 0 && (
                               <div className="text-xs opacity-80">
@@ -230,219 +358,22 @@
               <div className="flex items-center gap-4 text-xs text-gray-600">
                 <span className="font-semibold">Legend:</span>
                 <span className="flex items-center gap-1">
-                  <span className="w-4 h-4 bg-red-400 inline-block"></span> 50+
+                  <span className="w-4 h-4 inline-block" style={{backgroundColor: 'rgba(134, 239, 172, 0.4)'}}></span> 50+
                 </span>
                 <span className="flex items-center gap-1">
-                  <span className="w-4 h-4 bg-orange-300 inline-block"></span> 30-49
+                  <span className="w-4 h-4 inline-block" style={{backgroundColor: 'rgba(187, 247, 208, 0.35)'}}></span> 30-49
                 </span>
                 <span className="flex items-center gap-1">
-                  <span className="w-4 h-4 bg-yellow-200 inline-block"></span> 15-29
+                  <span className="w-4 h-4 inline-block" style={{backgroundColor: 'rgba(254, 249, 195, 0.5)'}}></span> 15-29
                 </span>
                 <span className="flex items-center gap-1">
-                  <span className="w-4 h-4 bg-green-200 inline-block"></span> 5-14
+                  <span className="w-4 h-4 inline-block" style={{backgroundColor: 'rgba(191, 219, 254, 0.4)'}}></span> 5-14
                 </span>
                 <span className="flex items-center gap-1">
-                  <span className="w-4 h-4 bg-blue-100 inline-block"></span> 1-4
+                  <span className="w-4 h-4 inline-block" style={{backgroundColor: 'rgba(219, 234, 254, 0.3)'}}></span> 1-4
                 </span>
               </div>
             </div>
-          </div>
-        );
-      };
-
-      // Developer Table Component (No medals/ranking)
-      const DeveloperTable = ({ developers }) => {
-        const [sortConfig, setSortConfig] = useState({ key: 'total', direction: 'desc' });
-
-        const sortedDevelopers = [...developers].sort((a, b) => {
-          if (sortConfig.direction === 'asc') {
-            return a[sortConfig.key] - b[sortConfig.key];
-          } else {
-            return b[sortConfig.key] - a[sortConfig.key];
-          }
-        });
-
-        const handleSort = (key) => {
-          setSortConfig({
-            key,
-            direction: sortConfig.key === key && sortConfig.direction === 'desc' ? 'asc' : 'desc',
-          });
-        };
-
-        const SortIcon = ({ columnKey }) => {
-          if (sortConfig.key !== columnKey) return <span className="text-gray-300">↕</span>;
-          return sortConfig.direction === 'desc' ? <span>↓</span> : <span>↑</span>;
-        };
-
-        return (
-          <div className="bg-white rounded-lg shadow-lg overflow-hidden mb-8">
-            <div className="px-6 py-4 bg-gradient-to-r from-telus-purple to-telus-light-purple">
-              <h3 className="text-xl font-bold text-white">Developer Summary</h3>
-            </div>
-            <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-200">
-                <thead className="bg-gray-50">
-                  <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Developer
-                    </th>
-                    <th 
-                      className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
-                      onClick={() => handleSort('total')}
-                    >
-                      Total Activity <SortIcon columnKey="total" />
-                    </th>
-                    <th 
-                      className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
-                      onClick={() => handleSort('jira')}
-                    >
-                      Jira Actions <SortIcon columnKey="jira" />
-                    </th>
-                    <th 
-                      className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
-                      onClick={() => handleSort('git')}
-                    >
-                      Repo Actions <SortIcon columnKey="git" />
-                    </th>
-                    <th 
-                      className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
-                      onClick={() => handleSort('sprints')}
-                    >
-                      Sprints <SortIcon columnKey="sprints" />
-                    </th>
-                    <th 
-                      className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
-                      onClick={() => handleSort('avgPerDay')}
-                    >
-                      Avg/Day <SortIcon columnKey="avgPerDay" />
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
-                  {sortedDevelopers.map((dev) => (
-                    <tr key={dev.name} className="hover:bg-gray-50">
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <span className="text-sm font-medium text-gray-900">{dev.name}</span>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <span className="text-sm font-bold text-telus-blue">{dev.total}</span>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <span className="text-sm text-telus-purple">{dev.jira}</span>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <span className="text-sm text-telus-green">{dev.git}</span>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <span className="text-sm text-gray-900">{dev.sprints}</span>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <span className="text-sm text-gray-600">{dev.avgPerDay}</span>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        );
-      };
-
-      // Sprint Card Component
-      const SprintCard = ({ sprint, index }) => {
-        const [expanded, setExpanded] = useState(false);
-
-        const stateColor = sprint.sprint.state === 'active' 
-          ? 'bg-green-100 text-green-800' 
-          : 'bg-gray-100 text-gray-800';
-
-        return (
-          <div className="bg-white rounded-lg shadow-lg overflow-hidden card-hover">
-            <div 
-              className="px-6 py-4 cursor-pointer hover:bg-gray-50"
-              onClick={() => setExpanded(!expanded)}
-            >
-              <div className="flex items-center justify-between">
-                <div className="flex-1">
-                  <div className="flex items-center gap-3">
-                    <h4 className="text-lg font-bold text-gray-900">
-                      {index + 1}. {sprint.sprint.name}
-                    </h4>
-                    <span className={`px-3 py-1 rounded-full text-xs font-semibold ${stateColor}`}>
-                      {sprint.sprint.state}
-                    </span>
-                  </div>
-                  <p className="text-sm text-gray-500 mt-1">
-                    {sprint.sprint.start_date} to {sprint.sprint.end_date}
-                  </p>
-                </div>
-                <div className="flex items-center gap-6">
-                  <div className="text-right">
-                    <p className="text-2xl font-bold text-telus-purple">
-                      {sprint.summary.sprint_total_activity}
-                    </p>
-                    <p className="text-xs text-gray-500">Total Actions</p>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-lg font-semibold text-gray-700">
-                      {sprint.developer_summary.length}
-                    </p>
-                    <p className="text-xs text-gray-500">Developers</p>
-                  </div>
-                  <div className="text-2xl text-gray-400">
-                    {expanded ? '▼' : '▶'}
-                  </div>
-                </div>
-              </div>
-            </div>
-            
-            {expanded && (
-              <div className="px-6 py-4 bg-gray-50 border-t border-gray-200">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                  <div>
-                    <p className="text-sm font-semibold text-gray-700">Sprint Details</p>
-                    <div className="mt-2 space-y-1">
-                      <p className="text-sm text-gray-600">
-                        Days: {sprint.sprint.days_count} ({sprint.sprint.days_elapsed} elapsed)
-                      </p>
-                      <p className="text-sm text-gray-600">
-                        Avg Daily Activity: {sprint.summary.avg_daily_activity}
-                      </p>
-                      <p className="text-sm text-gray-600">
-                        Most Active Day: {sprint.summary.most_active_day}
-                      </p>
-                    </div>
-                  </div>
-                  <div>
-                    <p className="text-sm font-semibold text-gray-700">Top Developer</p>
-                    <div className="mt-2">
-                      <p className="text-sm font-medium text-gray-900">
-                        {sprint.developer_summary[0]?.name || 'N/A'}
-                      </p>
-                      <p className="text-sm text-gray-600">
-                        {sprint.developer_summary[0]?.sprint_total || 0} actions
-                      </p>
-                    </div>
-                  </div>
-                </div>
-                
-                <div className="mt-4">
-                  <p className="text-sm font-semibold text-gray-700 mb-2">Developer Breakdown</p>
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
-                    {sprint.developer_summary.map((dev) => (
-                      <div key={dev.name} className="flex justify-between items-center bg-white px-3 py-2 rounded">
-                        <span className="text-sm text-gray-700 truncate">{dev.name.split(' ')[0]}</span>
-                        <div className="flex gap-3 text-xs">
-                          <span className="text-telus-purple font-medium">J:{dev.sprint_jira}</span>
-                          <span className="text-telus-green font-medium">R:{dev.sprint_git}</span>
-                          <span className="text-gray-900 font-bold">T:{dev.sprint_total}</span>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            )}
           </div>
         );
       };
@@ -453,7 +384,6 @@
         const [loading, setLoading] = useState(true);
         const [chartData, setChartData] = useState(null);
         const [tableData, setTableData] = useState(null);
-        const [processedData, setProcessedData] = useState(null);
 
         // Prepare line chart data
         const prepareLineChartData = (report, metricType) => {
@@ -541,41 +471,6 @@
           };
         };
 
-        // Process developer data
-        const processDeveloperData = (report) => {
-          const devMap = {};
-          
-          report.sprints.forEach(sprint => {
-            sprint.developer_summary.forEach(dev => {
-              if (!devMap[dev.email]) {
-                devMap[dev.email] = {
-                  name: dev.name,
-                  email: dev.email,
-                  total: 0,
-                  jira: 0,
-                  git: 0,
-                  sprints: 0,
-                  daysActive: 0,
-                };
-              }
-              devMap[dev.email].total += dev.sprint_total;
-              devMap[dev.email].jira += dev.sprint_jira;
-              devMap[dev.email].git += dev.sprint_git;
-              devMap[dev.email].sprints += 1;
-              devMap[dev.email].daysActive += dev.days_active;
-            });
-          });
-          
-          const developers = Object.values(devMap).map(dev => ({
-            ...dev,
-            avgPerDay: dev.daysActive > 0 ? (dev.total / dev.daysActive).toFixed(1) : 0,
-          }));
-          
-          developers.sort((a, b) => b.total - a.total);
-          
-          return { developers };
-        };
-
         useEffect(() => {
           fetch("./data/sprint_activity_report.json")
             .then((res) => res.json())
@@ -592,10 +487,6 @@
               // Prepare table data
               const sprintTable = prepareSprintTableData(reportData);
               setTableData(sprintTable);
-              
-              // Process developer data
-              const processed = processDeveloperData(reportData);
-              setProcessedData(processed);
               
               setLoading(false);
             })
@@ -637,43 +528,36 @@
               </p>
             </div>
 
-            {/* Three Line Charts */}
+            {/* Three Line Charts with Enhanced Tooltips */}
             <div className="grid grid-cols-1 gap-6 mb-8">
               <div className="bg-white rounded-lg shadow-lg p-6">
                 <LineChart
                   data={chartData.jiraData}
                   title="Jira Actions by Sprint"
+                  metricType="jira"
+                  fullSprintData={data}
                 />
               </div>
               <div className="bg-white rounded-lg shadow-lg p-6">
                 <LineChart
                   data={chartData.gitData}
                   title="Repo Actions by Sprint"
+                  metricType="git"
+                  fullSprintData={data}
                 />
               </div>
               <div className="bg-white rounded-lg shadow-lg p-6">
                 <LineChart
                   data={chartData.totalData}
                   title="Total Actions by Sprint"
+                  metricType="total"
+                  fullSprintData={data}
                 />
               </div>
             </div>
 
             {/* Sprint Activity Heatmap Table */}
             <SprintActivityTable tableData={tableData} />
-
-            {/* Developer Summary Table */}
-            <DeveloperTable developers={processedData.developers} />
-
-            {/* Sprint Cards */}
-            <div className="mb-8">
-              <h2 className="text-2xl font-bold text-gray-900 mb-4">Sprint-by-Sprint Breakdown</h2>
-              <div className="space-y-4">
-                {data.sprints.map((sprint, idx) => (
-                  <SprintCard key={sprint.sprint.id} sprint={sprint} index={idx} />
-                ))}
-              </div>
-            </div>
 
             {/* Footer */}
             <div className="text-center text-gray-500 text-sm py-4">
