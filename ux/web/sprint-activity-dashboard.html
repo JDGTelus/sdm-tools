@@ -31,8 +31,19 @@
     <script type="text/babel">
       const { useState, useEffect, useRef } = React;
 
-      // Horizontal Bar Chart Component
-      const HorizontalBarChart = ({ data, title, color }) => {
+      // Developer color palette (7 distinct colors)
+      const DEVELOPER_COLORS = [
+        '#4B0082',  // TELUS Purple
+        '#66CC00',  // TELUS Green
+        '#0066CC',  // TELUS Blue
+        '#FF6B6B',  // Red
+        '#FFB347',  // Orange
+        '#9B59B6',  // Purple
+        '#1ABC9C',  // Teal
+      ];
+
+      // Line Chart Component
+      const LineChart = ({ data, title }) => {
         const chartRef = useRef(null);
         const chartInstance = useRef(null);
 
@@ -42,71 +53,204 @@
 
           const ctx = chartRef.current.getContext("2d");
           chartInstance.current = new Chart(ctx, {
-            type: "bar",
+            type: "line",
             data: {
               labels: data.labels,
-              datasets: [
-                {
-                  label: title,
-                  data: data.values,
-                  backgroundColor: color,
-                  borderColor: color,
-                  borderWidth: 1,
-                },
-              ],
+              datasets: data.datasets,
             },
             options: {
-              indexAxis: "y",
               responsive: true,
               maintainAspectRatio: false,
+              interaction: {
+                mode: 'nearest',
+                intersect: false,
+                axis: 'x'
+              },
               plugins: {
-                legend: { display: false },
+                legend: {
+                  display: true,
+                  position: 'right',
+                  labels: {
+                    usePointStyle: true,
+                    padding: 10,
+                    font: { size: 11 }
+                  }
+                },
                 title: { 
                   display: true, 
                   text: title, 
                   font: { size: 16, weight: 'bold' },
                   color: '#1f2937'
                 },
+                tooltip: {
+                  backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                  padding: 12,
+                  titleFont: { size: 14, weight: 'bold' },
+                  bodyFont: { size: 13 },
+                  callbacks: {
+                    title: (tooltipItems) => {
+                      return tooltipItems[0].label;
+                    },
+                    label: (context) => {
+                      const developerName = context.dataset.label;
+                      const value = context.parsed.y;
+                      return `${developerName}: ${value} actions`;
+                    }
+                  }
+                }
               },
               scales: {
-                x: { 
-                  beginAtZero: true,
-                  ticks: { color: '#6b7280' },
+                x: {
+                  title: { 
+                    display: true, 
+                    text: 'Sprint',
+                    font: { size: 12, weight: 'bold' }
+                  },
+                  ticks: { 
+                    maxRotation: 45,
+                    minRotation: 45,
+                    font: { size: 10 }
+                  },
                   grid: { color: '#e5e7eb' }
                 },
-                y: { 
-                  ticks: { color: '#1f2937', font: { size: 12 } },
-                  grid: { display: false }
-                },
+                y: {
+                  beginAtZero: true,
+                  title: { 
+                    display: true, 
+                    text: 'Actions',
+                    font: { size: 12, weight: 'bold' }
+                  },
+                  ticks: { 
+                    color: '#6b7280',
+                    font: { size: 11 }
+                  },
+                  grid: { color: '#e5e7eb' }
+                }
               },
+              onHover: (event, activeElements, chart) => {
+                if (activeElements.length > 0) {
+                  const datasetIndex = activeElements[0].datasetIndex;
+                  
+                  chart.data.datasets.forEach((dataset, idx) => {
+                    if (idx === datasetIndex) {
+                      dataset.borderWidth = 4;
+                      dataset.pointRadius = 6;
+                    } else {
+                      dataset.borderWidth = 1;
+                      dataset.pointRadius = 3;
+                    }
+                  });
+                  
+                  chart.update('none');
+                } else {
+                  chart.data.datasets.forEach(dataset => {
+                    dataset.borderWidth = 2;
+                    dataset.pointRadius = 4;
+                  });
+                  chart.update('none');
+                }
+              }
             },
           });
 
           return () => {
             if (chartInstance.current) chartInstance.current.destroy();
           };
-        }, [data, title, color]);
+        }, [data, title]);
 
         return <canvas ref={chartRef} className="w-full" style={{ height: '400px' }}></canvas>;
       };
 
-      // Summary Card Component
-      const SummaryCard = ({ title, value, subtitle, icon }) => {
+      // Sprint Activity Table Component (Heatmap style)
+      const SprintActivityTable = ({ tableData }) => {
+        if (!tableData) return null;
+
+        const getActivityColor = (total) => {
+          if (total === 0) return 'bg-gray-50 text-gray-400';
+          if (total >= 50) return 'bg-red-400 text-white font-bold';
+          if (total >= 30) return 'bg-orange-300 text-gray-900 font-semibold';
+          if (total >= 15) return 'bg-yellow-200 text-gray-900';
+          if (total >= 5) return 'bg-green-200 text-gray-900';
+          return 'bg-blue-100 text-gray-900';
+        };
+
         return (
-          <div className="bg-white rounded-lg shadow-lg p-6 card-hover">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-600 font-medium">{title}</p>
-                <p className="text-3xl font-bold text-telus-purple mt-2">{value}</p>
-                {subtitle && <p className="text-sm text-gray-500 mt-1">{subtitle}</p>}
+          <div className="bg-white rounded-lg shadow-lg overflow-hidden mb-8">
+            <div className="px-6 py-4 bg-gradient-to-r from-telus-purple to-telus-light-purple">
+              <h3 className="text-xl font-bold text-white">Sprint Activity Heatmap</h3>
+              <p className="text-sm text-white opacity-90 mt-1">Activity breakdown by developer and sprint</p>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider sticky left-0 bg-gray-50">
+                      Developer
+                    </th>
+                    {tableData.sprints.map((sprint) => (
+                      <th key={sprint.id} className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        <div className="transform -rotate-45 origin-left whitespace-nowrap" style={{ width: '80px' }}>
+                          {sprint.name.replace('DevicesTITAN_', '')}
+                        </div>
+                      </th>
+                    ))}
+                    <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider bg-gray-100">
+                      Total
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {tableData.developers.map((dev) => (
+                    <tr key={dev.email} className="hover:bg-gray-50">
+                      <td className="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-900 sticky left-0 bg-white">
+                        {dev.name}
+                      </td>
+                      {tableData.sprints.map((sprint) => {
+                        const sprintData = dev.sprintData[sprint.id] || { total: 0, jira: 0, git: 0 };
+                        return (
+                          <td key={sprint.id} className={`px-2 py-2 text-center ${getActivityColor(sprintData.total)}`}>
+                            <div className="text-sm font-bold">{sprintData.total || '-'}</div>
+                            {sprintData.total > 0 && (
+                              <div className="text-xs opacity-80">
+                                J:{sprintData.jira} R:{sprintData.git}
+                              </div>
+                            )}
+                          </td>
+                        );
+                      })}
+                      <td className="px-4 py-3 text-center bg-gray-100 font-bold text-gray-900">
+                        {dev.total}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <div className="px-6 py-3 bg-gray-50 border-t border-gray-200">
+              <div className="flex items-center gap-4 text-xs text-gray-600">
+                <span className="font-semibold">Legend:</span>
+                <span className="flex items-center gap-1">
+                  <span className="w-4 h-4 bg-red-400 inline-block"></span> 50+
+                </span>
+                <span className="flex items-center gap-1">
+                  <span className="w-4 h-4 bg-orange-300 inline-block"></span> 30-49
+                </span>
+                <span className="flex items-center gap-1">
+                  <span className="w-4 h-4 bg-yellow-200 inline-block"></span> 15-29
+                </span>
+                <span className="flex items-center gap-1">
+                  <span className="w-4 h-4 bg-green-200 inline-block"></span> 5-14
+                </span>
+                <span className="flex items-center gap-1">
+                  <span className="w-4 h-4 bg-blue-100 inline-block"></span> 1-4
+                </span>
               </div>
-              {icon && <div className="text-4xl">{icon}</div>}
             </div>
           </div>
         );
       };
 
-      // Developer Table Component
+      // Developer Table Component (No medals/ranking)
       const DeveloperTable = ({ developers }) => {
         const [sortConfig, setSortConfig] = useState({ key: 'total', direction: 'desc' });
 
@@ -131,7 +275,7 @@
         };
 
         return (
-          <div className="bg-white rounded-lg shadow-lg overflow-hidden">
+          <div className="bg-white rounded-lg shadow-lg overflow-hidden mb-8">
             <div className="px-6 py-4 bg-gradient-to-r from-telus-purple to-telus-light-purple">
               <h3 className="text-xl font-bold text-white">Developer Summary</h3>
             </div>
@@ -175,17 +319,10 @@
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
-                  {sortedDevelopers.map((dev, idx) => (
-                    <tr key={dev.name} className={idx < 3 ? 'bg-purple-50' : 'hover:bg-gray-50'}>
+                  {sortedDevelopers.map((dev) => (
+                    <tr key={dev.name} className="hover:bg-gray-50">
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="flex items-center">
-                          {idx < 3 && (
-                            <span className="mr-2 text-lg">
-                              {idx === 0 ? '🥇' : idx === 1 ? '🥈' : '🥉'}
-                            </span>
-                          )}
-                          <span className="text-sm font-medium text-gray-900">{dev.name}</span>
-                        </div>
+                        <span className="text-sm font-medium text-gray-900">{dev.name}</span>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <span className="text-sm font-bold text-telus-blue">{dev.total}</span>
@@ -314,31 +451,100 @@
       const SprintActivityDashboard = () => {
         const [data, setData] = useState(null);
         const [loading, setLoading] = useState(true);
+        const [chartData, setChartData] = useState(null);
+        const [tableData, setTableData] = useState(null);
         const [processedData, setProcessedData] = useState(null);
 
-        useEffect(() => {
-          fetch("./data/sprint_activity_report.json")
-            .then((res) => res.json())
-            .then((reportData) => {
-              setData(reportData);
+        // Prepare line chart data
+        const prepareLineChartData = (report, metricType) => {
+          const sprintLabels = report.sprints.map(s => s.sprint.name.replace('DevicesTITAN_', ''));
+          
+          const developerEmails = [
+            ...new Set(
+              report.sprints.flatMap(s => 
+                s.developer_summary.map(d => d.email)
+              )
+            )
+          ];
+          
+          const datasets = developerEmails.map((email, idx) => {
+            const devName = report.sprints
+              .flatMap(s => s.developer_summary)
+              .find(d => d.email === email)?.name || email;
+            
+            const data = report.sprints.map(sprint => {
+              const dev = sprint.developer_summary.find(d => d.email === email);
+              if (!dev) return 0;
               
-              // Process data for visualizations
-              const processed = processDeveloperData(reportData);
-              setProcessedData(processed);
-              
-              setLoading(false);
-            })
-            .catch((err) => {
-              console.error("Error loading data:", err);
-              setLoading(false);
+              switch(metricType) {
+                case 'jira': return dev.sprint_jira;
+                case 'git': return dev.sprint_git;
+                case 'total': return dev.sprint_total;
+                default: return 0;
+              }
             });
-        }, []);
+            
+            return {
+              label: devName,
+              data: data,
+              borderColor: DEVELOPER_COLORS[idx % DEVELOPER_COLORS.length],
+              backgroundColor: DEVELOPER_COLORS[idx % DEVELOPER_COLORS.length],
+              borderWidth: 2,
+              tension: 0.3,
+              pointRadius: 4,
+              pointHoverRadius: 6,
+              pointBackgroundColor: DEVELOPER_COLORS[idx % DEVELOPER_COLORS.length],
+            };
+          });
+          
+          return {
+            labels: sprintLabels,
+            datasets: datasets
+          };
+        };
 
-        // Function to aggregate developer metrics from sprint data
+        // Prepare sprint activity table data
+        const prepareSprintTableData = (report) => {
+          const developerMap = {};
+          
+          report.sprints.forEach(sprint => {
+            sprint.developer_summary.forEach(dev => {
+              if (!developerMap[dev.email]) {
+                developerMap[dev.email] = {
+                  name: dev.name,
+                  email: dev.email,
+                  sprintData: {},
+                  total: 0,
+                  totalJira: 0,
+                  totalGit: 0
+                };
+              }
+              
+              developerMap[dev.email].sprintData[sprint.sprint.id] = {
+                total: dev.sprint_total,
+                jira: dev.sprint_jira,
+                git: dev.sprint_git
+              };
+              
+              developerMap[dev.email].total += dev.sprint_total;
+              developerMap[dev.email].totalJira += dev.sprint_jira;
+              developerMap[dev.email].totalGit += dev.sprint_git;
+            });
+          });
+          
+          return {
+            developers: Object.values(developerMap).sort((a, b) => b.total - a.total),
+            sprints: report.sprints.map(s => ({
+              id: s.sprint.id,
+              name: s.sprint.name
+            }))
+          };
+        };
+
+        // Process developer data
         const processDeveloperData = (report) => {
           const devMap = {};
           
-          // Aggregate metrics from all sprints
           report.sprints.forEach(sprint => {
             sprint.developer_summary.forEach(dev => {
               if (!devMap[dev.email]) {
@@ -360,31 +566,44 @@
             });
           });
           
-          // Convert to array and calculate averages
           const developers = Object.values(devMap).map(dev => ({
             ...dev,
             avgPerDay: dev.daysActive > 0 ? (dev.total / dev.daysActive).toFixed(1) : 0,
           }));
           
-          // Sort by total activity
           developers.sort((a, b) => b.total - a.total);
           
-          return {
-            developers,
-            jiraChartData: {
-              labels: developers.map(d => d.name),
-              values: developers.map(d => d.jira),
-            },
-            gitChartData: {
-              labels: developers.map(d => d.name),
-              values: developers.map(d => d.git),
-            },
-            totalChartData: {
-              labels: developers.map(d => d.name),
-              values: developers.map(d => d.total),
-            },
-          };
+          return { developers };
         };
+
+        useEffect(() => {
+          fetch("./data/sprint_activity_report.json")
+            .then((res) => res.json())
+            .then((reportData) => {
+              setData(reportData);
+              
+              // Prepare chart data
+              const jiraData = prepareLineChartData(reportData, 'jira');
+              const gitData = prepareLineChartData(reportData, 'git');
+              const totalData = prepareLineChartData(reportData, 'total');
+              
+              setChartData({ jiraData, gitData, totalData });
+              
+              // Prepare table data
+              const sprintTable = prepareSprintTableData(reportData);
+              setTableData(sprintTable);
+              
+              // Process developer data
+              const processed = processDeveloperData(reportData);
+              setProcessedData(processed);
+              
+              setLoading(false);
+            })
+            .catch((err) => {
+              console.error("Error loading data:", err);
+              setLoading(false);
+            });
+        }, []);
 
         if (loading) {
           return (
@@ -418,63 +637,33 @@
               </p>
             </div>
 
-            {/* Summary Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-              <SummaryCard
-                title="Total Activity"
-                value={data.overall_summary.total_activity}
-                subtitle="All Actions"
-                icon="📊"
-              />
-              <SummaryCard
-                title="Avg Per Sprint"
-                value={data.overall_summary.avg_per_sprint}
-                subtitle="Actions/Sprint"
-                icon="📈"
-              />
-              <SummaryCard
-                title="Most Active Sprint"
-                value={data.overall_summary.most_active_sprint.activity}
-                subtitle={data.overall_summary.most_active_sprint.name}
-                icon="🏆"
-              />
-              <SummaryCard
-                title="Active Developers"
-                value={data.overall_summary.unique_developers}
-                subtitle="Contributors"
-                icon="👥"
-              />
-            </div>
-
-            {/* Charts */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+            {/* Three Line Charts */}
+            <div className="grid grid-cols-1 gap-6 mb-8">
               <div className="bg-white rounded-lg shadow-lg p-6">
-                <HorizontalBarChart
-                  data={processedData.jiraChartData}
-                  title="Jira Actions by Developer"
-                  color="#4B0082"
+                <LineChart
+                  data={chartData.jiraData}
+                  title="Jira Actions by Sprint"
                 />
               </div>
               <div className="bg-white rounded-lg shadow-lg p-6">
-                <HorizontalBarChart
-                  data={processedData.gitChartData}
-                  title="Repo Actions by Developer"
-                  color="#66CC00"
+                <LineChart
+                  data={chartData.gitData}
+                  title="Repo Actions by Sprint"
                 />
               </div>
               <div className="bg-white rounded-lg shadow-lg p-6">
-                <HorizontalBarChart
-                  data={processedData.totalChartData}
-                  title="Total Actions by Developer"
-                  color="#0066CC"
+                <LineChart
+                  data={chartData.totalData}
+                  title="Total Actions by Sprint"
                 />
               </div>
             </div>
 
-            {/* Developer Table */}
-            <div className="mb-8">
-              <DeveloperTable developers={processedData.developers} />
-            </div>
+            {/* Sprint Activity Heatmap Table */}
+            <SprintActivityTable tableData={tableData} />
+
+            {/* Developer Summary Table */}
+            <DeveloperTable developers={processedData.developers} />
 
             {/* Sprint Cards */}
             <div className="mb-8">
