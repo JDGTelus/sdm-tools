@@ -261,14 +261,14 @@
                   
                   chart.data.datasets.forEach((dataset, idx) => {
                     if (idx === datasetIndex) {
-                      // Hovered line: thicker and solid
-                      dataset.borderWidth = 4;
-                      dataset.pointRadius = 6;
+                      // Hovered line: moderately thicker and solid
+                      dataset.borderWidth = 3;  // Reduced from 4
+                      dataset.pointRadius = 4;  // Reduced from 6
                       dataset.borderDash = [];  // Solid line
                     } else {
                       // Non-hovered lines: normal width, stay dashed
-                      dataset.borderWidth = 2;
-                      dataset.pointRadius = 4;
+                      dataset.borderWidth = 1.5;
+                      dataset.pointRadius = 2;
                       dataset.borderDash = dataset.defaultBorderDash || [];
                     }
                   });
@@ -277,8 +277,8 @@
                 } else {
                   // Reset all to default when not hovering
                   chart.data.datasets.forEach(dataset => {
-                    dataset.borderWidth = 2;
-                    dataset.pointRadius = 4;
+                    dataset.borderWidth = 1.5;
+                    dataset.pointRadius = 2;
                     dataset.borderDash = dataset.defaultBorderDash || [];
                   });
                   chart.update('none');
@@ -303,30 +303,30 @@
         if (!tableData) return null;
 
         const getActivityColor = (total) => {
-          // Using transparent blues, greens, and yellows only
+          // Using transparent blues, greens, and yellows only - greens and blues less transparent
           if (total === 0) return { 
             className: 'text-gray-400', 
             style: { backgroundColor: 'rgba(249, 250, 251, 0.5)' } 
           };
           if (total >= 50) return { 
             className: 'text-gray-900', 
-            style: { backgroundColor: 'rgba(134, 239, 172, 0.4)' }  // Green (top)
+            style: { backgroundColor: 'rgba(134, 239, 172, 0.6)' }  // Green (top) - less transparent
           };
           if (total >= 30) return { 
             className: 'text-gray-900', 
-            style: { backgroundColor: 'rgba(187, 247, 208, 0.35)' }  // Green (upper)
+            style: { backgroundColor: 'rgba(187, 247, 208, 0.55)' }  // Green (upper) - less transparent
           };
           if (total >= 15) return { 
             className: 'text-gray-900', 
-            style: { backgroundColor: 'rgba(254, 249, 195, 0.5)' }  // Yellow (middle)
+            style: { backgroundColor: 'rgba(254, 249, 195, 0.5)' }  // Yellow (middle) - unchanged
           };
           if (total >= 5) return { 
             className: 'text-gray-900', 
-            style: { backgroundColor: 'rgba(191, 219, 254, 0.4)' }  // Blue (lower)
+            style: { backgroundColor: 'rgba(191, 219, 254, 0.6)' }  // Blue (lower) - less transparent
           };
           return { 
             className: 'text-gray-700', 
-            style: { backgroundColor: 'rgba(219, 234, 254, 0.3)' }  // Blue (bottom)
+            style: { backgroundColor: 'rgba(219, 234, 254, 0.5)' }  // Blue (bottom) - less transparent
           };
         };
 
@@ -345,7 +345,7 @@
                     </th>
                     {tableData.sprints.map((sprint) => (
                       <th key={sprint.id} className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        <div className="transform -rotate-45 origin-left whitespace-nowrap" style={{ width: '80px' }}>
+                        <div className="whitespace-normal" style={{ maxWidth: '100px', lineHeight: '1.2' }}>
                           {sprint.name.replace('DevicesTITAN_', '')}
                         </div>
                       </th>
@@ -391,19 +391,19 @@
               <div className="flex items-center gap-4 text-xs text-gray-600">
                 <span className="font-semibold">Legend:</span>
                 <span className="flex items-center gap-1">
-                  <span className="w-4 h-4 inline-block" style={{backgroundColor: 'rgba(134, 239, 172, 0.4)'}}></span> 50+
+                  <span className="w-4 h-4 inline-block" style={{backgroundColor: 'rgba(134, 239, 172, 0.6)'}}></span> 50+
                 </span>
                 <span className="flex items-center gap-1">
-                  <span className="w-4 h-4 inline-block" style={{backgroundColor: 'rgba(187, 247, 208, 0.35)'}}></span> 30-49
+                  <span className="w-4 h-4 inline-block" style={{backgroundColor: 'rgba(187, 247, 208, 0.55)'}}></span> 30-49
                 </span>
                 <span className="flex items-center gap-1">
                   <span className="w-4 h-4 inline-block" style={{backgroundColor: 'rgba(254, 249, 195, 0.5)'}}></span> 15-29
                 </span>
                 <span className="flex items-center gap-1">
-                  <span className="w-4 h-4 inline-block" style={{backgroundColor: 'rgba(191, 219, 254, 0.4)'}}></span> 5-14
+                  <span className="w-4 h-4 inline-block" style={{backgroundColor: 'rgba(191, 219, 254, 0.6)'}}></span> 5-14
                 </span>
                 <span className="flex items-center gap-1">
-                  <span className="w-4 h-4 inline-block" style={{backgroundColor: 'rgba(219, 234, 254, 0.3)'}}></span> 1-4
+                  <span className="w-4 h-4 inline-block" style={{backgroundColor: 'rgba(219, 234, 254, 0.5)'}}></span> 1-4
                 </span>
               </div>
             </div>
@@ -420,11 +420,13 @@
 
         // Prepare line chart data with average lines
         const prepareLineChartData = (report, metricType) => {
-          const sprintLabels = report.sprints.map(s => s.sprint.name.replace('DevicesTITAN_', ''));
+          // Reverse sprints so oldest is first (left), newest is last (right)
+          const reversedSprints = [...report.sprints].reverse();
+          const sprintLabels = reversedSprints.map(s => s.sprint.name.replace('DevicesTITAN_', ''));
           
           const developerEmails = [
             ...new Set(
-              report.sprints.flatMap(s => 
+              reversedSprints.flatMap(s => 
                 s.developer_summary.map(d => d.email)
               )
             )
@@ -432,11 +434,11 @@
           
           // Create dataset for each developer (dashed lines)
           const datasets = developerEmails.map((email, idx) => {
-            const devName = report.sprints
+            const devName = reversedSprints
               .flatMap(s => s.developer_summary)
               .find(d => d.email === email)?.name || email;
             
-            const data = report.sprints.map(sprint => {
+            const data = reversedSprints.map(sprint => {
               const dev = sprint.developer_summary.find(d => d.email === email);
               if (!dev) return 0;
               
@@ -453,19 +455,19 @@
               data: data,
               borderColor: DEVELOPER_COLORS[idx % DEVELOPER_COLORS.length],
               backgroundColor: DEVELOPER_COLORS[idx % DEVELOPER_COLORS.length],
-              borderWidth: 2,
+              borderWidth: 1.5,  // Thinner lines
               tension: 0,  // Straight lines (not curved)
               borderDash: [5, 5],  // Dashed line
               defaultBorderDash: [5, 5],  // Store default for reset
-              pointRadius: 4,
-              pointHoverRadius: 6,
+              pointRadius: 2,  // Smaller dots
+              pointHoverRadius: 4,  // Smaller on hover too
               pointBackgroundColor: DEVELOPER_COLORS[idx % DEVELOPER_COLORS.length],
               isAverage: false
             };
           });
           
           // Calculate sprint averages (average per sprint across all developers)
-          const sprintAverages = report.sprints.map(sprint => {
+          const sprintAverages = reversedSprints.map(sprint => {
             const values = sprint.developer_summary.map(dev => {
               switch(metricType) {
                 case 'jira': return dev.sprint_jira;
@@ -478,7 +480,7 @@
           });
           
           // Calculate overall average (average across all sprints and developers)
-          const allValues = report.sprints.flatMap(sprint => 
+          const allValues = reversedSprints.flatMap(sprint => 
             sprint.developer_summary.map(dev => {
               switch(metricType) {
                 case 'jira': return dev.sprint_jira;
@@ -489,7 +491,7 @@
             })
           );
           const overallAverage = allValues.reduce((sum, v) => sum + v, 0) / allValues.length;
-          const overallAverages = new Array(report.sprints.length).fill(overallAverage);
+          const overallAverages = new Array(reversedSprints.length).fill(overallAverage);
           
           // Add sprint average line (red, dashed)
           datasets.push({
@@ -497,12 +499,12 @@
             data: sprintAverages,
             borderColor: SPRINT_AVG_COLOR,
             backgroundColor: SPRINT_AVG_COLOR,
-            borderWidth: 2,
+            borderWidth: 1.5,  // Thinner
             tension: 0,
             borderDash: [10, 5],  // Dashed
             defaultBorderDash: [10, 5],
-            pointRadius: 4,
-            pointHoverRadius: 6,
+            pointRadius: 2,  // Smaller dots
+            pointHoverRadius: 4,
             pointBackgroundColor: SPRINT_AVG_COLOR,
             isAverage: true
           });
@@ -513,12 +515,12 @@
             data: overallAverages,
             borderColor: OVERALL_AVG_COLOR,
             backgroundColor: OVERALL_AVG_COLOR,
-            borderWidth: 2,
+            borderWidth: 1.5,  // Thinner
             tension: 0,
             borderDash: [3, 3],  // Dashed
             defaultBorderDash: [3, 3],
             pointRadius: 0,  // No points for overall average
-            pointHoverRadius: 4,
+            pointHoverRadius: 2,
             pointBackgroundColor: OVERALL_AVG_COLOR,
             isAverage: true
           });
