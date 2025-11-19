@@ -664,3 +664,80 @@ def generate_multi_sprint_report_json(limit=10, output_file=None):
     except Exception as e:
         console.print(f"[bold red]Error writing JSON: {e}[/bold red]")
         return None
+
+
+def generate_sprint_velocity_report(limit=10, output_file=None):
+    """Generate sprint velocity report JSON file (Planned vs Delivered points).
+    
+    Args:
+        limit: Number of recent sprints to include (default: 10)
+        output_file: Output file path (default: ux/web/data/sprint_velocity_report.json)
+    
+    Returns:
+        Path to generated file or None
+    """
+    from .sprint_metrics import calculate_sprint_velocity, get_sprint_velocity_summary
+    
+    # Default output file
+    if output_file is None:
+        output_file = 'ux/web/data/sprint_velocity_report.json'
+    
+    console.print(f'\n[bold cyan]Generating Sprint Velocity Report...[/bold cyan]')
+    
+    # Get sprint velocity data
+    sprints_data = calculate_sprint_velocity(limit=limit)
+    
+    if not sprints_data:
+        console.print('[bold red]No sprint data available[/bold red]')
+        return None
+    
+    # Reverse to show oldest to newest (for chart progression left to right)
+    sprints_data.reverse()
+    
+    # Get summary statistics
+    summary = get_sprint_velocity_summary(limit=limit)
+    
+    # Build JSON structure
+    tz = get_local_timezone()
+    report = {
+        'generated_at': datetime.now(tz).isoformat(),
+        'report_type': 'sprint_velocity',
+        'metadata': {
+            'sprint_count': summary['sprint_count'],
+            'earliest_sprint': {
+                'id': sprints_data[0]['id'],
+                'name': sprints_data[0]['name'],
+                'start_date': sprints_data[0]['start_date']
+            } if sprints_data else None,
+            'latest_sprint': {
+                'id': sprints_data[-1]['id'],
+                'name': sprints_data[-1]['name'],
+                'start_date': sprints_data[-1]['start_date']
+            } if sprints_data else None,
+            'total_planned_points': summary['total_planned_points'],
+            'total_delivered_points': summary['total_delivered_points'],
+            'avg_planned_per_sprint': summary['avg_planned_per_sprint'],
+            'avg_delivered_per_sprint': summary['avg_delivered_per_sprint'],
+            'overall_completion_rate': summary['overall_completion_rate']
+        },
+        'sprints': sprints_data
+    }
+    
+    # Ensure directory exists
+    os.makedirs(os.path.dirname(output_file), exist_ok=True)
+    
+    # Write JSON
+    try:
+        with open(output_file, 'w') as f:
+            json.dump(report, f, indent=2)
+        
+        console.print(f'[bold green]✓ Sprint Velocity Report generated: {output_file}[/bold green]')
+        console.print(f'[dim]  Sprints analyzed: {summary["sprint_count"]}[/dim]')
+        console.print(f'[dim]  Total Planned: {summary["total_planned_points"]} points[/dim]')
+        console.print(f'[dim]  Total Delivered: {summary["total_delivered_points"]} points[/dim]')
+        console.print(f'[dim]  Avg Completion Rate: {summary["overall_completion_rate"]}%[/dim]')
+        
+        return output_file
+    except Exception as e:
+        console.print(f'[bold red]Error writing JSON: {e}[/bold red]')
+        return None

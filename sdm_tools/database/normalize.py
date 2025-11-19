@@ -434,6 +434,14 @@ def normalize_issues(old_conn, new_conn):
     if 'statuscategorychangedate' in columns:
         fields.append('statuscategorychangedate')
     
+    # Try to find story points field (common Jira customfields)
+    story_points_field = None
+    for possible_field in ['customfield_10016', 'customfield_10026', 'customfield_10002', 'customfield_10004']:
+        if possible_field in columns:
+            story_points_field = possible_field
+            fields.append(possible_field)
+            break
+    
     query = f"SELECT {', '.join(fields)} FROM {TABLE_NAME}"
     old_cursor.execute(query)
     
@@ -449,6 +457,18 @@ def normalize_issues(old_conn, new_conn):
         created = row[5] if len(row) > 5 else None
         updated = row[6] if len(row) > 6 else None
         status_changed = row[7] if len(row) > 7 and 'statuscategorychangedate' in columns else None
+        
+        # Extract story points if field exists
+        story_points = None
+        if story_points_field:
+            story_points_idx = 7 if 'statuscategorychangedate' in columns else 6
+            story_points_idx += 1  # Adjust for story points field position
+            story_points_raw = row[story_points_idx] if len(row) > story_points_idx else None
+            if story_points_raw is not None:
+                try:
+                    story_points = float(story_points_raw)
+                except (ValueError, TypeError):
+                    story_points = None
         
         # Extract status name from JSON
         status_name = None
@@ -479,13 +499,13 @@ def normalize_issues(old_conn, new_conn):
         # Insert issue
         new_cursor.execute("""
             INSERT INTO issues (
-                id, summary, status_name, assignee_id, creator_id,
+                id, summary, status_name, story_points, assignee_id, creator_id,
                 created_at, updated_at, created_date_local, updated_date_local,
                 status_changed_at, status_changed_date_local
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, (
-            issue_id, summary, status_name, assignee_id, creator_id,
+            issue_id, summary, status_name, story_points, assignee_id, creator_id,
             created, updated, created_date_local, updated_date_local,
             status_changed, status_changed_date_local
         ))

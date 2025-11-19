@@ -81,6 +81,7 @@ def create_normalized_schema(conn):
             id TEXT PRIMARY KEY,
             summary TEXT,
             status_name TEXT,
+            story_points REAL,
             assignee_id INTEGER,
             creator_id INTEGER,
             created_at TEXT,

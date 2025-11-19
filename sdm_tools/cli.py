@@ -143,11 +143,12 @@ def handle_generate_reports():
         console.print("[bold yellow]Generate Activity Report:[/bold yellow]\n")
         console.print("[bold cyan]1. Single day report (default: today)[/bold cyan]")
         console.print("[bold cyan]2. Full sprint report[/bold cyan]")
-        console.print("[bold cyan]3. Generate standalone report (dist/)[/bold cyan]")
-        console.print("[bold cyan]4. Generate bundled SPA report (dist/)[/bold cyan]")
-        console.print("[bold cyan]5. Back to main menu[/bold cyan]")
+        console.print("[bold cyan]3. Sprint velocity report (Planned vs Delivered)[/bold cyan]")
+        console.print("[bold cyan]4. Generate standalone report (dist/)[/bold cyan]")
+        console.print("[bold cyan]5. Generate bundled SPA report (dist/)[/bold cyan]")
+        console.print("[bold cyan]6. Back to main menu[/bold cyan]")
         
-        choice = console.input("\n[bold green]Enter your choice (1/2/3/4/5): [/bold green]").strip()
+        choice = console.input("\n[bold green]Enter your choice (1/2/3/4/5/6): [/bold green]").strip()
         
         if choice == "1":
             # Single day report
@@ -209,6 +210,43 @@ def handle_generate_reports():
             input("\nPress Enter to continue...")
             
         elif choice == "3":
+            # Sprint velocity report (Planned vs Delivered)
+            from .database.reports import generate_sprint_velocity_report
+            
+            sprints = get_available_sprints()
+            
+            if not sprints:
+                console.print("\n[bold yellow]No sprints found. Please refresh data first.[/bold yellow]")
+                input("\nPress Enter to continue...")
+                continue
+            
+            # Show sprint count information
+            sprint_count = len(sprints)
+            limit = min(10, sprint_count)
+            
+            console.print("\n[bold cyan]Generating Sprint Velocity Report...[/bold cyan]")
+            console.print(f"[dim]This report shows planned vs delivered story points[/dim]")
+            
+            if sprint_count < 10:
+                console.print(f"[yellow]Found {sprint_count} sprint(s) (fewer than 10 available)[/yellow]")
+            else:
+                console.print(f"[dim]Processing last {limit} sprints[/dim]")
+            
+            # Generate velocity report
+            output = generate_sprint_velocity_report(limit=limit)
+            
+            if output:
+                console.print(f"\n[bold green]✓ Sprint velocity report generated![/bold green]")
+                console.print(f"[dim]File: {output}[/dim]")
+                console.print(f"[dim]Open ux/web/sprint-velocity-dashboard.html to view[/dim]")
+            else:
+                console.print("\n[bold red]Failed to generate velocity report.[/bold red]")
+                console.print("[yellow]Make sure story points data is available in the database.[/yellow]")
+                console.print("[yellow]You may need to refresh data to capture story points.[/yellow]")
+            
+            input("\nPress Enter to continue...")
+            
+        elif choice == "4":
             # Generate standalone report
             console.print("\n[bold cyan]═══════════════════════════════════════════════[/bold cyan]")
             console.print("[bold cyan]        GENERATE STANDALONE REPORT[/bold cyan]")
@@ -230,7 +268,7 @@ def handle_generate_reports():
             
             input("\nPress Enter to continue...")
             
-        elif choice == "4":
+        elif choice == "5":
             # Generate bundled SPA
             from .database.standalone import generate_bundle_spa
             
@@ -255,7 +293,7 @@ def handle_generate_reports():
             
             input("\nPress Enter to continue...")
             
-        elif choice == "5":
+        elif choice == "6":
             break
         else:
             console.print("[bold red]Invalid choice.[/bold red]")
