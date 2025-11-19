@@ -202,56 +202,183 @@ def generate_all_standalone_reports():
 # BUNDLED SPA GENERATION
 # ============================================================================
 
-def _load_json_data(filepath):
-    """Load JSON data from file."""
-    path = Path(filepath)
-    if not path.exists():
+def _discover_standalone_reports():
+    """
+    Discover all standalone HTML reports in dist/ directory.
+    
+    Returns:
+        List of dicts with report metadata, sorted alphabetically by filename
+    """
+    import re
+    
+    dist_dir = Path('dist')
+    if not dist_dir.exists():
+        return []
+    
+    reports = []
+    for html_file in sorted(dist_dir.glob('*.html')):
+        # Skip the bundle itself
+        if html_file.name == 'reports-bundle.html':
+            continue
+        
+        # Read file and extract metadata
+        with open(html_file, 'r') as f:
+            content = f.read()
+        
+        # Extract title
+        title_match = re.search(r'<title>(.*?)</title>', content)
+        title = title_match.group(1) if title_match else html_file.stem.replace('-', ' ').title()
+        
+        # Extract report type
+        type_match = re.search(r'"report_type":\s*"(\w+)"', content)
+        report_type = type_match.group(1) if type_match else 'unknown'
+        
+        # Determine icon and view name based on filename/type
+        if 'daily' in html_file.name.lower() or report_type == 'daily':
+            icon = '📅'
+            view_name = 'daily'
+        elif 'sprint' in html_file.name.lower() or report_type in ['multi_sprint', 'sprint']:
+            icon = '📊'
+            view_name = 'sprint'
+        else:
+            icon = '📄'
+            view_name = html_file.stem.replace('-', '_')
+        
+        reports.append({
+            'filename': html_file.name,
+            'filepath': html_file,
+            'title': title,
+            'report_type': report_type,
+            'icon': icon,
+            'view_name': view_name,
+            'size': html_file.stat().st_size
+        })
+    
+    return reports
+
+
+def _extract_data_from_standalone(filepath):
+    """
+    Extract embedded JSON data from a standalone HTML file.
+    
+    Args:
+        filepath: Path to standalone HTML file
+    
+    Returns:
+        Parsed JSON data object, or None if extraction fails
+    """
+    import re
+    
+    with open(filepath, 'r') as f:
+        content = f.read()
+    
+    # Pattern: Promise.resolve({...data...}).then((reportData)
+    pattern = r'Promise\.resolve\((.*?)\)\s*\.then\(\(reportData\)'
+    match = re.search(pattern, content, re.DOTALL)
+    
+    if not match:
+        console.print(f"[yellow]Warning: Could not extract data from {filepath.name}[/yellow]")
         return None
-    with open(path, 'r') as f:
-        return json.load(f)
+    
+    data_str = match.group(1)
+    
+    try:
+        data = json.loads(data_str)
+        return data
+    except json.JSONDecodeError as e:
+        console.print(f"[red]Error parsing JSON from {filepath.name}: {e}[/red]")
+        return None
 
 
-def _load_css_file(filepath):
-    """Load CSS content from file."""
-    path = Path(filepath)
-    if not path.exists():
-        return ""
-    with open(path, 'r') as f:
-        return f.read()
+def _extract_component_from_standalone(filepath):
+    """
+    Extract React component code from a standalone HTML file.
+    
+    Args:
+        filepath: Path to standalone HTML file
+    
+    Returns:
+        Component JavaScript code as string, or None if extraction fails
+    """
+    import re
+    
+    with open(filepath, 'r') as f:
+        content = f.read()
+    
+    # Pattern: <script type="text/babel">...component code...</script>
+    pattern = r'<script type="text/babel">\s*(.*?)</script>'
+    match = re.search(pattern, content, re.DOTALL)
+    
+    if not match:
+        console.print(f"[yellow]Warning: Could not extract components from {filepath.name}[/yellow]")
+        return None
+    
+    component_code = match.group(1)
+    
+    # Remove the React hooks declaration (will be declared once in bundle)
+    # Pattern: const { useState, useEffect, useRef } = React;
+    react_hooks_pattern = r'\s*const\s*\{\s*useState\s*,\s*useEffect\s*,?\s*useRef?\s*\}\s*=\s*React\s*;'
+    component_code = re.sub(react_hooks_pattern, '', component_code)
+    
+    # Remove the ReactDOM render calls at the end
+    # Keep everything before ReactDOM.render or ReactDOM.createRoot
+    render_patterns = [
+        r'\s*//\s*Render.*?ReactDOM\.render\([^;]+\);',
+        r'\s*//\s*Render.*?const root = ReactDOM\.createRoot.*?root\.render\([^;]+\);',
+        r'\s*ReactDOM\.render\([^;]+\);',
+        r'\s*const root = ReactDOM\.createRoot.*?root\.render\([^;]+\);'
+    ]
+    
+    for pattern in render_patterns:
+        component_code = re.sub(pattern, '', component_code, flags=re.DOTALL)
+    
+    return component_code.strip()
 
 
-def _build_spa_template(daily_data, sprint_data, css_content):
-    """Build complete SPA HTML template with sidebar navigation."""
-    from .spa_components import COMPONENT_CODE
+def _extract_css_from_standalone(filepath):
+    """
+    Extract inlined CSS from a standalone HTML file.
     
-    # Convert data to JS objects
-    daily_js = json.dumps(daily_data, indent=2)
-    sprint_js = json.dumps(sprint_data, indent=2)
+    Args:
+        filepath: Path to standalone HTML file
     
-    # Read the template file
-    template_path = Path(__file__).parent / "spa_bundle_template.html"
-    with open(template_path, 'r') as f:
-        template = f.read()
+    Returns:
+        CSS content as string, or empty string if not found
+    """
+    import re
     
-    # Replace placeholders
-    template = template.replace('/*{CSS_PLACEHOLDER}*/', css_content)
-    template = template.replace('/*{DAILY_DATA_PLACEHOLDER}*/', daily_js)
-    template = template.replace('/*{SPRINT_DATA_PLACEHOLDER}*/', sprint_js)
-    template = template.replace('/*{COMPONENT_CODE_PLACEHOLDER}*/', COMPONENT_CODE)
+    with open(filepath, 'r') as f:
+        content = f.read()
     
-    return template
+    # Pattern: <style>/* Inlined from ... */\n{css content}</style>
+    pattern = r'<style>\s*/\* Inlined from.*?\*/\s*(.*?)</style>'
+    match = re.search(pattern, content, re.DOTALL)
+    
+    if match:
+        return match.group(1).strip()
+    
+    # Fallback: try to get any style content between tailwind config and custom tooltip styles
+    # Look for the main shared styles section
+    pattern = r'</script>\s*<style>(.*?)</style>'
+    matches = re.findall(pattern, content, re.DOTALL)
+    
+    if matches:
+        # Return the first substantial style block
+        for css in matches:
+            css = css.strip()
+            if len(css) > 100:  # Substantial CSS content
+                return css
+    
+    return ""
 
 
 def generate_bundle_spa(output_file=None):
     """
-    Generate bundled SPA with all reports and side navigation.
+    Generate bundled SPA from existing standalone reports in dist/.
     
-    Creates a single standalone HTML file that includes:
-    - Side navigation menu
-    - Daily activity dashboard
-    - Sprint activity dashboard
-    - All data embedded inline
-    - All styles embedded inline
+    Discovers all standalone HTML files in dist/, extracts their data
+    and components, and creates a unified SPA with dynamic navigation.
+    First report found (alphabetically) becomes the default landing view.
     
     Args:
         output_file: Output file path (default: dist/reports-bundle.html)
@@ -259,45 +386,125 @@ def generate_bundle_spa(output_file=None):
     Returns:
         Path to generated file or None on error
     """
+    import re
+    
     if output_file is None:
         output_file = "dist/reports-bundle.html"
     
-    console.print("\n[bold cyan]Generating Bundled SPA Report...[/bold cyan]")
+    console.print("\n[bold cyan]Generating Bundled SPA from Standalone Reports...[/bold cyan]")
     
     try:
-        # 1. Load data files
-        daily_data = _load_json_data("ux/web/data/daily_activity_report.json")
-        sprint_data = _load_json_data("ux/web/data/sprint_activity_report.json")
+        # Step 1: Discover standalone reports
+        reports = _discover_standalone_reports()
         
-        if not daily_data:
-            console.print("[bold red]Error: daily_activity_report.json not found[/bold red]")
-            console.print("[dim]Run 'Generate Reports > Single day report' first[/dim]")
+        if not reports:
+            console.print("[bold red]Error: No standalone reports found in dist/[/bold red]")
+            console.print("[dim]Run 'Generate Reports > Generate standalone report (dist/)' first[/dim]")
             return None
         
-        if not sprint_data:
-            console.print("[bold red]Error: sprint_activity_report.json not found[/bold red]")
-            console.print("[dim]Run 'Generate Reports > Full sprint report' first[/dim]")
+        console.print(f"[dim]Found {len(reports)} standalone report(s):[/dim]")
+        for i, report in enumerate(reports):
+            default_marker = " [default]" if i == 0 else ""
+            console.print(f"[dim]  {i+1}. {report['icon']} {report['title']} ({report['filename']}){default_marker}[/dim]")
+        
+        # Step 2: Extract data from each report
+        console.print(f"\n[dim]Extracting data from standalone files...[/dim]")
+        reports_data = {}
+        total_data_size = 0
+        
+        for report in reports:
+            data = _extract_data_from_standalone(report['filepath'])
+            
+            if data:
+                reports_data[report['view_name']] = data
+                data_size = len(json.dumps(data))
+                total_data_size += data_size
+                console.print(f"[dim]  ✓ {report['filename']}: {data_size:,} bytes[/dim]")
+            else:
+                console.print(f"[yellow]  ✗ {report['filename']}: no data extracted[/yellow]")
+        
+        if not reports_data:
+            console.print("[bold red]Error: No data could be extracted from reports[/bold red]")
             return None
         
-        # 2. Load CSS
-        css_content = _load_css_file("ux/web/shared-dashboard-styles.css")
+        # Step 3: Extract components from each report
+        console.print(f"\n[dim]Extracting components from standalone files...[/dim]")
+        all_components = []
         
-        # 3. Build HTML template
-        html_content = _build_spa_template(daily_data, sprint_data, css_content)
+        for report in reports:
+            component_code = _extract_component_from_standalone(report['filepath'])
+            
+            if component_code:
+                all_components.append(f"\n      // ==================== {report['title']} ====================\n{component_code}\n")
+                console.print(f"[dim]  ✓ {report['filename']}: {len(component_code):,} chars[/dim]")
+            else:
+                console.print(f"[yellow]  ✗ {report['filename']}: no components extracted[/yellow]")
         
-        # 4. Write to dist/
+        # Step 4: Extract and merge CSS
+        console.print(f"\n[dim]Extracting CSS from standalone files...[/dim]")
+        all_css = []
+        seen_css = set()
+        
+        for report in reports:
+            css = _extract_css_from_standalone(report['filepath'])
+            if css and css not in seen_css:
+                all_css.append(css)
+                seen_css.add(css)
+                console.print(f"[dim]  ✓ {report['filename']}: {len(css):,} chars[/dim]")
+        
+        merged_css = '\n'.join(all_css)
+        
+        # Step 5: Build reports metadata for sidebar
+        reports_metadata = [
+            {
+                'view_name': r['view_name'],
+                'title': r['title'],
+                'icon': r['icon']
+            }
+            for r in reports
+        ]
+        
+        # Step 6: Build the bundle using new dynamic template approach
+        console.print(f"\n[dim]Building bundle template...[/dim]")
+        
+        # Build data object JavaScript
+        data_entries = []
+        for view_name, data in reports_data.items():
+            data_json = json.dumps(data, indent=2)
+            # Indent the JSON properly
+            indented_json = '\n'.join('    ' + line for line in data_json.split('\n'))
+            data_entries.append(f"  '{view_name}':\n{indented_json}")
+        
+        embedded_data_js = "{\n" + ",\n".join(data_entries) + "\n  }"
+        
+        # Build metadata JavaScript array
+        metadata_js = json.dumps(reports_metadata, indent=2)
+        indented_metadata = '\n'.join('        ' + line for line in metadata_js.split('\n'))
+        
+        # Build component code
+        all_components_code = '\n'.join(all_components)
+        
+        # Create the complete bundle HTML
+        bundle_html = _build_dynamic_bundle_template(
+            embedded_data=embedded_data_js,
+            reports_metadata=indented_metadata,
+            components_code=all_components_code,
+            css_content=merged_css,
+            default_view=reports[0]['view_name']  # First report is default
+        )
+        
+        # Step 7: Write to dist/
         Path("dist").mkdir(exist_ok=True)
         with open(output_file, 'w') as f:
-            f.write(html_content)
+            f.write(bundle_html)
         
         # Calculate sizes
-        daily_size = len(json.dumps(daily_data))
-        sprint_size = len(json.dumps(sprint_data))
-        total_size = len(html_content)
+        total_size = len(bundle_html)
         
-        console.print(f"[bold green]✓ Bundled SPA generated: {output_file}[/bold green]")
-        console.print(f"[dim]  Daily data: {daily_size:,} bytes[/dim]")
-        console.print(f"[dim]  Sprint data: {sprint_size:,} bytes[/dim]")
+        console.print(f"\n[bold green]✓ Bundled SPA generated: {output_file}[/bold green]")
+        console.print(f"[dim]  Reports included: {len(reports)}[/dim]")
+        console.print(f"[dim]  Default landing: {reports[0]['icon']} {reports[0]['title']}[/dim]")
+        console.print(f"[dim]  Total data size: {total_data_size:,} bytes[/dim]")
         console.print(f"[dim]  Total file size: {total_size:,} bytes ({total_size/1024:.1f} KB)[/dim]")
         
         return output_file
@@ -307,3 +514,246 @@ def generate_bundle_spa(output_file=None):
         import traceback
         traceback.print_exc()
         return None
+
+
+def _build_dynamic_bundle_template(embedded_data, reports_metadata, components_code, css_content, default_view):
+    """
+    Build the dynamic bundle HTML template.
+    
+    This creates a complete HTML file that doesn't rely on spa_components.py
+    but instead uses extracted components from standalone files.
+    """
+    
+    template = f'''<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>SDM Tools - Reports Bundle</title>
+    <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <script>
+      tailwind.config = {{
+        theme: {{
+          extend: {{
+            colors: {{
+              "telus-purple": "#4B0082",
+              "telus-green": "#66CC00",
+              "telus-blue": "#0066CC",
+              "telus-light-purple": "#8A2BE2",
+              "telus-dark-purple": "#2E0054",
+            }},
+          }},
+        }},
+      }};
+    </script>
+    <style>
+{css_content}
+
+/* Sidebar navigation styles */
+.sidebar {{
+  position: fixed;
+  left: 0;
+  top: 0;
+  height: 100vh;
+  background: linear-gradient(180deg, #4B0082, #2E0054);
+  transition: width 0.3s ease;
+  z-index: 1000;
+  overflow: hidden;
+  box-shadow: 2px 0 10px rgba(0,0,0,0.1);
+}}
+
+.sidebar-open {{ width: 260px; }}
+.sidebar-closed {{ width: 70px; }}
+
+.sidebar-header {{
+  padding: 20px;
+  color: white;
+  border-bottom: 1px solid rgba(255,255,255,0.1);
+  margin-bottom: 10px;
+}}
+
+.sidebar-title {{
+  font-size: 18px;
+  font-weight: bold;
+  white-space: nowrap;
+  overflow: hidden;
+}}
+
+.toggle-btn {{
+  position: absolute;
+  top: 20px;
+  right: 15px;
+  background: rgba(255,255,255,0.2);
+  border: none;
+  color: white;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.2s;
+  font-size: 16px;
+}}
+
+.toggle-btn:hover {{
+  background: rgba(255,255,255,0.3);
+}}
+
+.nav-item {{
+  padding: 16px 20px;
+  color: white;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  white-space: nowrap;
+  overflow: hidden;
+}}
+
+.nav-item-icon {{
+  font-size: 20px;
+  flex-shrink: 0;
+  width: 24px;
+  text-align: center;
+}}
+
+.nav-item-text {{
+  font-size: 14px;
+  font-weight: 500;
+}}
+
+.nav-item:hover {{
+  background: rgba(255,255,255,0.1);
+  padding-left: 24px;
+}}
+
+.nav-item.active {{
+  background: rgba(255,255,255,0.2);
+  border-left: 4px solid #66CC00;
+  font-weight: 600;
+}}
+
+.sidebar-footer {{
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  padding: 20px;
+  color: rgba(255,255,255,0.6);
+  font-size: 11px;
+  text-align: center;
+  border-top: 1px solid rgba(255,255,255,0.1);
+  white-space: nowrap;
+  overflow: hidden;
+}}
+
+.main-content {{
+  transition: margin-left 0.3s ease;
+}}
+
+.main-content.with-sidebar-open {{
+  margin-left: 260px;
+}}
+
+.main-content.with-sidebar-closed {{
+  margin-left: 70px;
+}}
+    </style>
+  </head>
+  <body class="bg-gray-50">
+    <div id="root"></div>
+    <script type="text/babel">
+      const {{ useState, useEffect, useRef }} = React;
+
+      // ═══════════════════════════════════════════════════════════════════════
+      // EMBEDDED DATA FROM STANDALONE REPORTS
+      // ═══════════════════════════════════════════════════════════════════════
+      
+      const EMBEDDED_DATA = {embedded_data};
+
+      // ═══════════════════════════════════════════════════════════════════════
+      // COMPONENTS EXTRACTED FROM STANDALONE REPORTS
+      // ═══════════════════════════════════════════════════════════════════════
+{components_code}
+
+      // ═══════════════════════════════════════════════════════════════════════
+      // SIDEBAR NAVIGATION
+      // ═══════════════════════════════════════════════════════════════════════
+
+      const Sidebar = ({{ currentView, onNavigate, isOpen, toggle, reports }}) => {{
+        return (
+          <div className={{`sidebar ${{isOpen ? 'sidebar-open' : 'sidebar-closed'}}`}}>
+            <div className="sidebar-header">
+              <div className="sidebar-title">
+                {{isOpen ? 'SDM Reports' : 'SDM'}}
+              </div>
+              <button onClick={{toggle}} className="toggle-btn">
+                {{isOpen ? '←' : '→'}}
+              </button>
+            </div>
+            
+            <nav>
+              {{reports.map(report => (
+                <div 
+                  key={{report.view_name}}
+                  className={{`nav-item ${{currentView === report.view_name ? 'active' : ''}}`}}
+                  onClick={{() => onNavigate(report.view_name)}}
+                >
+                  <span className="nav-item-icon">{{report.icon}}</span>
+                  {{isOpen && <span className="nav-item-text">{{report.title}}</span>}}
+                </div>
+              ))}}
+            </nav>
+            
+            {{isOpen && (
+              <div className="sidebar-footer">
+                SDM Tools<br/>Bundled Reports
+              </div>
+            )}}
+          </div>
+        );
+      }};
+
+      // ═══════════════════════════════════════════════════════════════════════
+      // MAIN APP WITH DYNAMIC NAVIGATION
+      // ═══════════════════════════════════════════════════════════════════════
+
+      const BundledReportsApp = () => {{
+        const reportsMetadata = {reports_metadata};
+        
+        const [currentView, setCurrentView] = useState('{default_view}');
+        const [sidebarOpen, setSidebarOpen] = useState(true);
+
+        return (
+          <>
+            <Sidebar 
+              currentView={{currentView}} 
+              onNavigate={{setCurrentView}}
+              isOpen={{sidebarOpen}}
+              toggle={{() => setSidebarOpen(!sidebarOpen)}}
+              reports={{reportsMetadata}}
+            />
+            <div className={{`main-content ${{sidebarOpen ? 'with-sidebar-open' : 'with-sidebar-closed'}}`}}>
+              {{currentView === 'daily' && EMBEDDED_DATA.daily && <DailyActivityDashboard />}}
+              {{currentView === 'sprint' && EMBEDDED_DATA.sprint && <SprintActivityDashboard />}}
+            </div>
+          </>
+        );
+      }};
+
+      // Render the app
+      const root = ReactDOM.createRoot(document.getElementById('root'));
+      root.render(<BundledReportsApp />);
+    </script>
+  </body>
+</html>
+'''
+    
+    return template
