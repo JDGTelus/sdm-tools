@@ -196,3 +196,114 @@ def _add_network_note(html_content):
 def generate_all_standalone_reports():
     """Convenience function to generate all standalone reports."""
     return generate_standalone_report(report_name=None)
+
+
+# ============================================================================
+# BUNDLED SPA GENERATION
+# ============================================================================
+
+def _load_json_data(filepath):
+    """Load JSON data from file."""
+    path = Path(filepath)
+    if not path.exists():
+        return None
+    with open(path, 'r') as f:
+        return json.load(f)
+
+
+def _load_css_file(filepath):
+    """Load CSS content from file."""
+    path = Path(filepath)
+    if not path.exists():
+        return ""
+    with open(path, 'r') as f:
+        return f.read()
+
+
+def _build_spa_template(daily_data, sprint_data, css_content):
+    """Build complete SPA HTML template with sidebar navigation."""
+    from .spa_components import COMPONENT_CODE
+    
+    # Convert data to JS objects
+    daily_js = json.dumps(daily_data, indent=2)
+    sprint_js = json.dumps(sprint_data, indent=2)
+    
+    # Read the template file
+    template_path = Path(__file__).parent / "spa_bundle_template.html"
+    with open(template_path, 'r') as f:
+        template = f.read()
+    
+    # Replace placeholders
+    template = template.replace('/*{CSS_PLACEHOLDER}*/', css_content)
+    template = template.replace('/*{DAILY_DATA_PLACEHOLDER}*/', daily_js)
+    template = template.replace('/*{SPRINT_DATA_PLACEHOLDER}*/', sprint_js)
+    template = template.replace('/*{COMPONENT_CODE_PLACEHOLDER}*/', COMPONENT_CODE)
+    
+    return template
+
+
+def generate_bundle_spa(output_file=None):
+    """
+    Generate bundled SPA with all reports and side navigation.
+    
+    Creates a single standalone HTML file that includes:
+    - Side navigation menu
+    - Daily activity dashboard
+    - Sprint activity dashboard
+    - All data embedded inline
+    - All styles embedded inline
+    
+    Args:
+        output_file: Output file path (default: dist/reports-bundle.html)
+    
+    Returns:
+        Path to generated file or None on error
+    """
+    if output_file is None:
+        output_file = "dist/reports-bundle.html"
+    
+    console.print("\n[bold cyan]Generating Bundled SPA Report...[/bold cyan]")
+    
+    try:
+        # 1. Load data files
+        daily_data = _load_json_data("ux/web/data/daily_activity_report.json")
+        sprint_data = _load_json_data("ux/web/data/sprint_activity_report.json")
+        
+        if not daily_data:
+            console.print("[bold red]Error: daily_activity_report.json not found[/bold red]")
+            console.print("[dim]Run 'Generate Reports > Single day report' first[/dim]")
+            return None
+        
+        if not sprint_data:
+            console.print("[bold red]Error: sprint_activity_report.json not found[/bold red]")
+            console.print("[dim]Run 'Generate Reports > Full sprint report' first[/dim]")
+            return None
+        
+        # 2. Load CSS
+        css_content = _load_css_file("ux/web/shared-dashboard-styles.css")
+        
+        # 3. Build HTML template
+        html_content = _build_spa_template(daily_data, sprint_data, css_content)
+        
+        # 4. Write to dist/
+        Path("dist").mkdir(exist_ok=True)
+        with open(output_file, 'w') as f:
+            f.write(html_content)
+        
+        # Calculate sizes
+        daily_size = len(json.dumps(daily_data))
+        sprint_size = len(json.dumps(sprint_data))
+        total_size = len(html_content)
+        
+        console.print(f"[bold green]✓ Bundled SPA generated: {output_file}[/bold green]")
+        console.print(f"[dim]  Daily data: {daily_size:,} bytes[/dim]")
+        console.print(f"[dim]  Sprint data: {sprint_size:,} bytes[/dim]")
+        console.print(f"[dim]  Total file size: {total_size:,} bytes ({total_size/1024:.1f} KB)[/dim]")
+        
+        return output_file
+        
+    except Exception as e:
+        console.print(f"[bold red]Error generating bundled SPA: {e}[/bold red]")
+        import traceback
+        traceback.print_exc()
+        return None

@@ -144,9 +144,10 @@ def handle_generate_reports():
         console.print("[bold cyan]1. Single day report (default: today)[/bold cyan]")
         console.print("[bold cyan]2. Full sprint report[/bold cyan]")
         console.print("[bold cyan]3. Generate standalone report (dist/)[/bold cyan]")
-        console.print("[bold cyan]4. Back to main menu[/bold cyan]")
+        console.print("[bold cyan]4. Generate bundled SPA report (dist/)[/bold cyan]")
+        console.print("[bold cyan]5. Back to main menu[/bold cyan]")
         
-        choice = console.input("\n[bold green]Enter your choice (1/2/3/4): [/bold green]").strip()
+        choice = console.input("\n[bold green]Enter your choice (1/2/3/4/5): [/bold green]").strip()
         
         if choice == "1":
             # Single day report
@@ -230,6 +231,31 @@ def handle_generate_reports():
             input("\nPress Enter to continue...")
             
         elif choice == "4":
+            # Generate bundled SPA
+            from .database.standalone import generate_bundle_spa
+            
+            console.print("\n[bold cyan]═══════════════════════════════════════════════[/bold cyan]")
+            console.print("[bold cyan]        GENERATE BUNDLED SPA REPORT[/bold cyan]")
+            console.print("[bold cyan]═══════════════════════════════════════════════[/bold cyan]\n")
+            
+            console.print("[dim]This will create a single-file SPA in dist/[/dim]")
+            console.print("[dim]Includes side navigation to switch between reports.[/dim]")
+            console.print("[dim]All data and styling will be inlined.[/dim]")
+            console.print("[dim]Requires internet access for CDN libraries.\n[/dim]")
+            
+            bundle_file = generate_bundle_spa()
+            
+            if bundle_file:
+                console.print(f"\n[bold green]✓ Bundled SPA generated successfully![/bold green]\n")
+                console.print(f"  [bold white]→ {bundle_file}[/bold white]")
+                console.print(f"\n[dim]Open this file directly in your browser.[/dim]")
+                console.print(f"[dim]Use the sidebar to navigate between reports.[/dim]")
+            else:
+                console.print("[bold red]Failed to generate bundled SPA.[/bold red]")
+            
+            input("\nPress Enter to continue...")
+            
+        elif choice == "5":
             break
         else:
             console.print("[bold red]Invalid choice.[/bold red]")
