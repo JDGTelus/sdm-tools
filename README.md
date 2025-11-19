@@ -121,65 +121,70 @@ export TIMEZONE='America/Toronto'
 
 The CLI provides the following options:
 
-1. **Manage Jira issues (get/update/display)**
-   - Fetch issues from Jira using the configured JQL query
-   - Update existing issue data
-   - Display issues with customizable columns and pagination
+1. **Refresh All Data (Jira + Git → Normalize)**
+   - Complete data refresh workflow
+   - Fetches from Jira and Git repositories
+   - Normalizes and processes all data
 
-2. **Manage git commits (get/update/display)**
-   - Fetch commit information from ALL branches in the local repository
-   - Captures commits from feature branches, remote branches, and all refs
-   - Update commit data since the earliest Jira ticket date
-   - Display commits with author information and pagination
+2. **Generate Activity Reports**
+   - **Single day report**: Time-bucketed activity for a specific date
+   - **Full sprint report**: Multi-sprint activity trends and analysis
+   - **Standalone reports**: Self-contained HTML files in `dist/`
+   - **Bundled SPA**: Single-file app combining all reports with navigation
 
-3. **Daily activity report JSON (generate/display)**
-   - Generate time-bucketed activity analysis for a specific date
-   - Track activity by 2-hour time buckets (8am-10am, 10am-12pm, etc.)
-   - Identify off-hours activity (outside standard work hours)
-   - Include both Jira and repository actions per time bucket
-   - Activity heatmap showing intensity by developer and time
-   - Save to `ux/web/data/daily_activity_report.json`
-   - Display formatted summary in the terminal
+3. **View Sprints**
+   - List all available sprints with metadata
+   - View sprint dates and status
 
-4. **Exit**
+4. **View Active Developers**
+   - List configured active developers
+   - Based on `INCLUDED_EMAILS` configuration
 
-### Daily Activity Dashboard
+5. **Exit**
 
-The daily activity dashboard is a standalone HTML file that provides comprehensive time-based analysis:
+### Activity Dashboards
 
-#### Features
-- **Date Selection**: Generate reports for any specific date (defaults to today)
-- **Time Buckets**: Activity shown in 2-hour intervals:
-  - 10am (8:00-9:59)
-  - 12pm (10:00-11:59)
-  - 2pm (12:00-13:59)
-  - 4pm (14:00-15:59)
-  - 6pm (16:00-17:59)
-  - Off-Hours (6pm previous day - 8am current day)
-- **Activity Heatmap**: Color-coded table showing developer activity intensity
-- **Interactive Charts**:
-  - Activity by Time Bucket (stacked bar chart)
-  - Regular vs Off-Hours (doughnut chart)
-  - Developer Rankings (bar chart)
-- **Summary Cards**: Total developers, total activity, most active bucket, off-hours percentage
+SDM Tools generates multiple types of interactive HTML dashboards:
 
-#### Viewing the Report
+#### Daily Activity Dashboard
+Provides comprehensive time-based analysis for a single day:
+- **Time Buckets**: Activity in 2-hour intervals (8am-10am, 10am-12pm, etc.)
+- **Activity Heatmap**: Color-coded table showing developer intensity
+- **Interactive Charts**: Bar charts, doughnut charts, developer rankings
+- **Off-Hours Tracking**: Work done outside standard hours
 
-After generating the daily activity report JSON (option 3), the standalone HTML file can be found at:
-```
-ux/web/daily-activity-dashboard.html
-```
+#### Sprint Activity Dashboard
+Multi-sprint trend analysis and visualization:
+- **Trend Charts**: Line charts showing activity progression across sprints
+- **Sprint Comparison**: Compare activity across multiple sprints
+- **Heatmap Table**: Developer activity by sprint
+- **Statistical Averages**: Sprint and overall averages
 
-To view it:
-1. Open `ux/web/daily-activity-dashboard.html` in any web browser
-2. The dashboard loads data from `ux/web/data/daily_activity_report.json`
-3. No server needed - works completely offline
+#### Bundled SPA Report
+Single-file application combining all reports:
+- **Dynamic Discovery**: Automatically includes all reports from `dist/`
+- **Side Navigation**: Toggle between different report views
+- **Default Landing**: First report (alphabetically) shown by default
+- **Fully Portable**: Single HTML file with all data embedded
 
-The dashboard features:
+#### Viewing Reports
+
+**Standalone Reports** (in `ux/web/`):
+- Open `ux/web/daily-activity-dashboard.html` for daily view
+- Open `ux/web/sprint-activity-dashboard.html` for sprint view
+- Requires data files in `ux/web/data/`
+
+**Bundled Reports** (in `dist/`):
+1. Generate standalone reports (CLI Option 2 → 3)
+2. Generate bundle (CLI Option 2 → 4)
+3. Open `dist/reports-bundle.html` in browser
+4. Use sidebar to navigate between reports
+
+All dashboards feature:
 - Self-contained with embedded React, Chart.js, and TailwindCSS
 - Responsive design for desktop, tablet, and mobile
-- Color-coded activity levels (green for high, yellow for medium, etc.)
-- Detailed breakdown of Jira vs Repository actions
+- Works offline (CDN libraries require internet)
+- All data embedded at generation time
 
 ## Data Structure
 
@@ -203,8 +208,17 @@ For each developer and time bucket, the tool tracks:
 ### Generated Files
 
 The tool generates:
-- `ux/web/data/daily_activity_report.json`: Daily activity data in JSON format
-- Timestamped backups of previous reports
+- **Data Files**:
+  - `ux/web/data/daily_activity_report.json`: Daily activity data
+  - `ux/web/data/sprint_activity_report.json`: Multi-sprint data
+  
+- **Standalone Reports** (`dist/`):
+  - `daily-activity-dashboard.html`: Self-contained daily report
+  - `sprint-activity-dashboard.html`: Self-contained sprint report
+  - `reports-bundle.html`: Bundled SPA with all reports
+  
+- **Database**:
+  - `data/sdm_tools.db`: SQLite database with normalized data
 
 ## File Structure
 
@@ -216,17 +230,26 @@ sdm-tools/
 │   │   ├── issues.py      # Jira issues management
 │   │   ├── commits.py     # Git commits management
 │   │   ├── sprints.py     # Sprint data processing
-│   │   └── stats.py       # Daily activity report generation
+│   │   ├── normalize.py   # Data normalization
+│   │   ├── reports.py     # Report generation
+│   │   ├── standalone.py  # Standalone HTML generation
+│   │   └── refresh.py     # Data refresh workflow
 │   ├── cli.py             # CLI interface
 │   ├── config.py          # Configuration management
 │   ├── jira.py            # Jira API integration
 │   ├── repo.py            # Git repository integration
 │   └── utils.py           # Utility functions
-├── ux/web/                 # Web dashboard
-│   ├── daily-activity-dashboard.html  # Standalone dashboard
-│   ├── shared-dashboard-styles.css    # Dashboard styles
+├── ux/web/                 # Web dashboards (templates)
+│   ├── daily-activity-dashboard.html
+│   ├── sprint-activity-dashboard.html
+│   ├── shared-dashboard-styles.css
 │   └── data/              # Generated JSON files
-│       └── daily_activity_report.json
+│       ├── daily_activity_report.json
+│       └── sprint_activity_report.json
+├── dist/                   # Standalone reports (generated)
+│   ├── daily-activity-dashboard.html
+│   ├── sprint-activity-dashboard.html
+│   └── reports-bundle.html
 ├── data/                   # SQLite database
 │   └── sdm_tools.db
 ├── requirements.txt        # Python dependencies

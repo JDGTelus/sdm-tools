@@ -262,8 +262,8 @@
                   chart.data.datasets.forEach((dataset, idx) => {
                     if (idx === datasetIndex) {
                       // Hovered line: moderately thicker and solid
-                      dataset.borderWidth = 3;  // Reduced from 4
-                      dataset.pointRadius = 4;  // Reduced from 6
+                      dataset.borderWidth = 3;
+                      dataset.pointRadius = 4;
                       dataset.borderDash = [];  // Solid line
                     } else {
                       // Non-hovered lines: normal width, stay dashed
@@ -458,9 +458,9 @@
               borderWidth: 1.5,  // Thinner lines
               tension: 0,  // Straight lines (not curved)
               borderDash: [5, 5],  // Dashed line
-              defaultBorderDash: [5, 5],  // Store default for reset
-              pointRadius: 2,  // Smaller dots
-              pointHoverRadius: 4,  // Smaller on hover too
+              defaultBorderDash: [5, 5],
+              pointRadius: 2,
+              pointHoverRadius: 4,
               pointBackgroundColor: DEVELOPER_COLORS[idx % DEVELOPER_COLORS.length],
               isAverage: false
             };
@@ -503,7 +503,7 @@
             tension: 0,
             borderDash: [10, 5],  // Dashed
             defaultBorderDash: [10, 5],
-            pointRadius: 2,  // Smaller dots
+            pointRadius: 2,
             pointHoverRadius: 4,
             pointBackgroundColor: SPRINT_AVG_COLOR,
             isAverage: true
