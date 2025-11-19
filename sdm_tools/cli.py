@@ -173,7 +173,7 @@ def handle_generate_reports():
             input("\nPress Enter to continue...")
             
         elif choice == "2":
-            # Sprint report
+            # Sprint report - always generates last 10 sprints (or fewer if less available)
             sprints = get_available_sprints()
             
             if not sprints:
@@ -181,25 +181,29 @@ def handle_generate_reports():
                 input("\nPress Enter to continue...")
                 continue
             
-            # Show recent sprints
-            console.print("\n[bold]Recent sprints:[/bold]")
-            for i, (sprint_id, name, state, start, end) in enumerate(sprints[:5], 1):
+            # Show sprint count information
+            sprint_count = len(sprints)
+            limit = min(10, sprint_count)
+            
+            console.print("\n[bold cyan]Generating Sprint Activity Report...[/bold cyan]")
+            if sprint_count < 10:
+                console.print(f"[yellow]Found {sprint_count} sprint(s) (fewer than 10 available)[/yellow]")
+            else:
+                console.print(f"[dim]Processing last {limit} sprints[/dim]")
+            
+            # Show recent sprints that will be included
+            console.print("\n[bold]Sprints to be included:[/bold]")
+            for i, (sprint_id, name, state, start, end) in enumerate(sprints[:limit], 1):
                 state_icon = "🟢" if state == "active" else "⚪"
-                console.print(f"  {state_icon} {sprint_id}: {name} ({state})")
+                console.print(f"  {i}. {state_icon} {name} ({state})")
             
-            sprint_input = console.input(
-                "\n[bold yellow]Enter sprint ID: [/bold yellow]"
-            ).strip()
+            # Generate multi-sprint report (always)
+            output = generate_sprint_report_json()
             
-            try:
-                sprint_id = int(sprint_input)
-                output = generate_sprint_report_json(sprint_id)
-                
-                if output:
-                    console.print(f"\n[bold green]✓ Sprint report generated![/bold green]")
-                    console.print(f"[dim]File: {output}[/dim]")
-            except ValueError:
-                console.print("[bold red]Invalid sprint ID.[/bold red]")
+            if output:
+                console.print(f"\n[bold green]✓ Sprint report generated![/bold green]")
+                console.print(f"[dim]File: {output}[/dim]")
+                console.print(f"[dim]Open ux/web/sprint-activity-dashboard.html to view[/dim]")
             
             input("\nPress Enter to continue...")
             

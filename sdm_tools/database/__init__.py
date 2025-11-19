@@ -25,7 +25,9 @@ from .reports import (
     query_daily_activity,
     query_sprint_activity,
     query_date_range_activity,
+    query_multi_sprint_activity,
     generate_sprint_report_json,
+    generate_multi_sprint_report_json,
 )
 from .standalone import generate_standalone_report, generate_all_standalone_reports
 
@@ -55,7 +57,9 @@ __all__ = [
     "query_daily_activity",
     "query_sprint_activity",
     "query_date_range_activity",
+    "query_multi_sprint_activity",
     "generate_sprint_report_json",
+    "generate_multi_sprint_report_json",
     # Standalone report generation
     "generate_standalone_report",
     "generate_all_standalone_reports",

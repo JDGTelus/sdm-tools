@@ -1,0 +1,503 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Sprint Activity Dashboard</title>
+    <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            colors: {
+              "telus-purple": "#4B0082",
+              "telus-green": "#66CC00",
+              "telus-blue": "#0066CC",
+              "telus-light-purple": "#8A2BE2",
+              "telus-dark-purple": "#2E0054",
+            },
+          },
+        },
+      };
+    </script>
+    <link rel="stylesheet" href="shared-dashboard-styles.css" />
+  </head>
+  <body class="bg-gray-50">
+    <div id="root"></div>
+    <script type="text/babel">
+      const { useState, useEffect, useRef } = React;
+
+      // Horizontal Bar Chart Component
+      const HorizontalBarChart = ({ data, title, color }) => {
+        const chartRef = useRef(null);
+        const chartInstance = useRef(null);
+
+        useEffect(() => {
+          if (!chartRef.current || !data) return;
+          if (chartInstance.current) chartInstance.current.destroy();
+
+          const ctx = chartRef.current.getContext("2d");
+          chartInstance.current = new Chart(ctx, {
+            type: "bar",
+            data: {
+              labels: data.labels,
+              datasets: [
+                {
+                  label: title,
+                  data: data.values,
+                  backgroundColor: color,
+                  borderColor: color,
+                  borderWidth: 1,
+                },
+              ],
+            },
+            options: {
+              indexAxis: "y",
+              responsive: true,
+              maintainAspectRatio: false,
+              plugins: {
+                legend: { display: false },
+                title: { 
+                  display: true, 
+                  text: title, 
+                  font: { size: 16, weight: 'bold' },
+                  color: '#1f2937'
+                },
+              },
+              scales: {
+                x: { 
+                  beginAtZero: true,
+                  ticks: { color: '#6b7280' },
+                  grid: { color: '#e5e7eb' }
+                },
+                y: { 
+                  ticks: { color: '#1f2937', font: { size: 12 } },
+                  grid: { display: false }
+                },
+              },
+            },
+          });
+
+          return () => {
+            if (chartInstance.current) chartInstance.current.destroy();
+          };
+        }, [data, title, color]);
+
+        return <canvas ref={chartRef} className="w-full" style={{ height: '400px' }}></canvas>;
+      };
+
+      // Summary Card Component
+      const SummaryCard = ({ title, value, subtitle, icon }) => {
+        return (
+          <div className="bg-white rounded-lg shadow-lg p-6 card-hover">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-600 font-medium">{title}</p>
+                <p className="text-3xl font-bold text-telus-purple mt-2">{value}</p>
+                {subtitle && <p className="text-sm text-gray-500 mt-1">{subtitle}</p>}
+              </div>
+              {icon && <div className="text-4xl">{icon}</div>}
+            </div>
+          </div>
+        );
+      };
+
+      // Developer Table Component
+      const DeveloperTable = ({ developers }) => {
+        const [sortConfig, setSortConfig] = useState({ key: 'total', direction: 'desc' });
+
+        const sortedDevelopers = [...developers].sort((a, b) => {
+          if (sortConfig.direction === 'asc') {
+            return a[sortConfig.key] - b[sortConfig.key];
+          } else {
+            return b[sortConfig.key] - a[sortConfig.key];
+          }
+        });
+
+        const handleSort = (key) => {
+          setSortConfig({
+            key,
+            direction: sortConfig.key === key && sortConfig.direction === 'desc' ? 'asc' : 'desc',
+          });
+        };
+
+        const SortIcon = ({ columnKey }) => {
+          if (sortConfig.key !== columnKey) return <span className="text-gray-300">↕</span>;
+          return sortConfig.direction === 'desc' ? <span>↓</span> : <span>↑</span>;
+        };
+
+        return (
+          <div className="bg-white rounded-lg shadow-lg overflow-hidden">
+            <div className="px-6 py-4 bg-gradient-to-r from-telus-purple to-telus-light-purple">
+              <h3 className="text-xl font-bold text-white">Developer Summary</h3>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Developer
+                    </th>
+                    <th 
+                      className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+                      onClick={() => handleSort('total')}
+                    >
+                      Total Activity <SortIcon columnKey="total" />
+                    </th>
+                    <th 
+                      className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+                      onClick={() => handleSort('jira')}
+                    >
+                      Jira Actions <SortIcon columnKey="jira" />
+                    </th>
+                    <th 
+                      className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+                      onClick={() => handleSort('git')}
+                    >
+                      Repo Actions <SortIcon columnKey="git" />
+                    </th>
+                    <th 
+                      className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+                      onClick={() => handleSort('sprints')}
+                    >
+                      Sprints <SortIcon columnKey="sprints" />
+                    </th>
+                    <th 
+                      className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+                      onClick={() => handleSort('avgPerDay')}
+                    >
+                      Avg/Day <SortIcon columnKey="avgPerDay" />
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {sortedDevelopers.map((dev, idx) => (
+                    <tr key={dev.name} className={idx < 3 ? 'bg-purple-50' : 'hover:bg-gray-50'}>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="flex items-center">
+                          {idx < 3 && (
+                            <span className="mr-2 text-lg">
+                              {idx === 0 ? '🥇' : idx === 1 ? '🥈' : '🥉'}
+                            </span>
+                          )}
+                          <span className="text-sm font-medium text-gray-900">{dev.name}</span>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <span className="text-sm font-bold text-telus-blue">{dev.total}</span>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <span className="text-sm text-telus-purple">{dev.jira}</span>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <span className="text-sm text-telus-green">{dev.git}</span>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <span className="text-sm text-gray-900">{dev.sprints}</span>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <span className="text-sm text-gray-600">{dev.avgPerDay}</span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        );
+      };
+
+      // Sprint Card Component
+      const SprintCard = ({ sprint, index }) => {
+        const [expanded, setExpanded] = useState(false);
+
+        const stateColor = sprint.sprint.state === 'active' 
+          ? 'bg-green-100 text-green-800' 
+          : 'bg-gray-100 text-gray-800';
+
+        return (
+          <div className="bg-white rounded-lg shadow-lg overflow-hidden card-hover">
+            <div 
+              className="px-6 py-4 cursor-pointer hover:bg-gray-50"
+              onClick={() => setExpanded(!expanded)}
+            >
+              <div className="flex items-center justify-between">
+                <div className="flex-1">
+                  <div className="flex items-center gap-3">
+                    <h4 className="text-lg font-bold text-gray-900">
+                      {index + 1}. {sprint.sprint.name}
+                    </h4>
+                    <span className={`px-3 py-1 rounded-full text-xs font-semibold ${stateColor}`}>
+                      {sprint.sprint.state}
+                    </span>
+                  </div>
+                  <p className="text-sm text-gray-500 mt-1">
+                    {sprint.sprint.start_date} to {sprint.sprint.end_date}
+                  </p>
+                </div>
+                <div className="flex items-center gap-6">
+                  <div className="text-right">
+                    <p className="text-2xl font-bold text-telus-purple">
+                      {sprint.summary.sprint_total_activity}
+                    </p>
+                    <p className="text-xs text-gray-500">Total Actions</p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-lg font-semibold text-gray-700">
+                      {sprint.developer_summary.length}
+                    </p>
+                    <p className="text-xs text-gray-500">Developers</p>
+                  </div>
+                  <div className="text-2xl text-gray-400">
+                    {expanded ? '▼' : '▶'}
+                  </div>
+                </div>
+              </div>
+            </div>
+            
+            {expanded && (
+              <div className="px-6 py-4 bg-gray-50 border-t border-gray-200">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                  <div>
+                    <p className="text-sm font-semibold text-gray-700">Sprint Details</p>
+                    <div className="mt-2 space-y-1">
+                      <p className="text-sm text-gray-600">
+                        Days: {sprint.sprint.days_count} ({sprint.sprint.days_elapsed} elapsed)
+                      </p>
+                      <p className="text-sm text-gray-600">
+                        Avg Daily Activity: {sprint.summary.avg_daily_activity}
+                      </p>
+                      <p className="text-sm text-gray-600">
+                        Most Active Day: {sprint.summary.most_active_day}
+                      </p>
+                    </div>
+                  </div>
+                  <div>
+                    <p className="text-sm font-semibold text-gray-700">Top Developer</p>
+                    <div className="mt-2">
+                      <p className="text-sm font-medium text-gray-900">
+                        {sprint.developer_summary[0]?.name || 'N/A'}
+                      </p>
+                      <p className="text-sm text-gray-600">
+                        {sprint.developer_summary[0]?.sprint_total || 0} actions
+                      </p>
+                    </div>
+                  </div>
+                </div>
+                
+                <div className="mt-4">
+                  <p className="text-sm font-semibold text-gray-700 mb-2">Developer Breakdown</p>
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
+                    {sprint.developer_summary.map((dev) => (
+                      <div key={dev.name} className="flex justify-between items-center bg-white px-3 py-2 rounded">
+                        <span className="text-sm text-gray-700 truncate">{dev.name.split(' ')[0]}</span>
+                        <div className="flex gap-3 text-xs">
+                          <span className="text-telus-purple font-medium">J:{dev.sprint_jira}</span>
+                          <span className="text-telus-green font-medium">R:{dev.sprint_git}</span>
+                          <span className="text-gray-900 font-bold">T:{dev.sprint_total}</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        );
+      };
+
+      // Main Dashboard Component
+      const SprintActivityDashboard = () => {
+        const [data, setData] = useState(null);
+        const [loading, setLoading] = useState(true);
+        const [processedData, setProcessedData] = useState(null);
+
+        useEffect(() => {
+          fetch("./data/sprint_activity_report.json")
+            .then((res) => res.json())
+            .then((reportData) => {
+              setData(reportData);
+              
+              // Process data for visualizations
+              const processed = processDeveloperData(reportData);
+              setProcessedData(processed);
+              
+              setLoading(false);
+            })
+            .catch((err) => {
+              console.error("Error loading data:", err);
+              setLoading(false);
+            });
+        }, []);
+
+        // Function to aggregate developer metrics from sprint data
+        const processDeveloperData = (report) => {
+          const devMap = {};
+          
+          // Aggregate metrics from all sprints
+          report.sprints.forEach(sprint => {
+            sprint.developer_summary.forEach(dev => {
+              if (!devMap[dev.email]) {
+                devMap[dev.email] = {
+                  name: dev.name,
+                  email: dev.email,
+                  total: 0,
+                  jira: 0,
+                  git: 0,
+                  sprints: 0,
+                  daysActive: 0,
+                };
+              }
+              devMap[dev.email].total += dev.sprint_total;
+              devMap[dev.email].jira += dev.sprint_jira;
+              devMap[dev.email].git += dev.sprint_git;
+              devMap[dev.email].sprints += 1;
+              devMap[dev.email].daysActive += dev.days_active;
+            });
+          });
+          
+          // Convert to array and calculate averages
+          const developers = Object.values(devMap).map(dev => ({
+            ...dev,
+            avgPerDay: dev.daysActive > 0 ? (dev.total / dev.daysActive).toFixed(1) : 0,
+          }));
+          
+          // Sort by total activity
+          developers.sort((a, b) => b.total - a.total);
+          
+          return {
+            developers,
+            jiraChartData: {
+              labels: developers.map(d => d.name),
+              values: developers.map(d => d.jira),
+            },
+            gitChartData: {
+              labels: developers.map(d => d.name),
+              values: developers.map(d => d.git),
+            },
+            totalChartData: {
+              labels: developers.map(d => d.name),
+              values: developers.map(d => d.total),
+            },
+          };
+        };
+
+        if (loading) {
+          return (
+            <div className="min-h-screen flex items-center justify-center">
+              <div className="text-xl text-telus-purple">Loading Sprint Activity Data...</div>
+            </div>
+          );
+        }
+
+        if (!data) {
+          return (
+            <div className="min-h-screen flex items-center justify-center">
+              <div className="text-xl text-red-500">Failed to load sprint activity data</div>
+            </div>
+          );
+        }
+
+        return (
+          <div className="min-h-screen p-6">
+            {/* Header */}
+            <div className="gradient-bg rounded-lg shadow-lg p-8 mb-8">
+              <h1 className="text-4xl font-bold text-white mb-2">
+                Sprint Activity Dashboard
+              </h1>
+              <p className="text-white text-lg">
+                Last {data.metadata.sprint_count} Sprint{data.metadata.sprint_count !== 1 ? 's' : ''} 
+                {' '}({data.metadata.earliest_sprint.start_date} to {data.metadata.latest_sprint.start_date})
+              </p>
+              <p className="text-white text-sm mt-1 opacity-90">
+                Generated: {new Date(data.generated_at).toLocaleString()}
+              </p>
+            </div>
+
+            {/* Summary Cards */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+              <SummaryCard
+                title="Total Activity"
+                value={data.overall_summary.total_activity}
+                subtitle="All Actions"
+                icon="📊"
+              />
+              <SummaryCard
+                title="Avg Per Sprint"
+                value={data.overall_summary.avg_per_sprint}
+                subtitle="Actions/Sprint"
+                icon="📈"
+              />
+              <SummaryCard
+                title="Most Active Sprint"
+                value={data.overall_summary.most_active_sprint.activity}
+                subtitle={data.overall_summary.most_active_sprint.name}
+                icon="🏆"
+              />
+              <SummaryCard
+                title="Active Developers"
+                value={data.overall_summary.unique_developers}
+                subtitle="Contributors"
+                icon="👥"
+              />
+            </div>
+
+            {/* Charts */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+              <div className="bg-white rounded-lg shadow-lg p-6">
+                <HorizontalBarChart
+                  data={processedData.jiraChartData}
+                  title="Jira Actions by Developer"
+                  color="#4B0082"
+                />
+              </div>
+              <div className="bg-white rounded-lg shadow-lg p-6">
+                <HorizontalBarChart
+                  data={processedData.gitChartData}
+                  title="Repo Actions by Developer"
+                  color="#66CC00"
+                />
+              </div>
+              <div className="bg-white rounded-lg shadow-lg p-6">
+                <HorizontalBarChart
+                  data={processedData.totalChartData}
+                  title="Total Actions by Developer"
+                  color="#0066CC"
+                />
+              </div>
+            </div>
+
+            {/* Developer Table */}
+            <div className="mb-8">
+              <DeveloperTable developers={processedData.developers} />
+            </div>
+
+            {/* Sprint Cards */}
+            <div className="mb-8">
+              <h2 className="text-2xl font-bold text-gray-900 mb-4">Sprint-by-Sprint Breakdown</h2>
+              <div className="space-y-4">
+                {data.sprints.map((sprint, idx) => (
+                  <SprintCard key={sprint.sprint.id} sprint={sprint} index={idx} />
+                ))}
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className="text-center text-gray-500 text-sm py-4">
+              <p>SDM Tools - Sprint Activity Dashboard</p>
+              <p className="text-xs mt-1">Data updated: {new Date(data.generated_at).toLocaleDateString()}</p>
+            </div>
+          </div>
+        );
+      };
+
+      // Render App
+      const root = ReactDOM.createRoot(document.getElementById("root"));
+      root.render(<SprintActivityDashboard />);
+    </script>
+  </body>
+</html>

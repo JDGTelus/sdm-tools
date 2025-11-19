@@ -454,11 +454,173 @@ def generate_daily_report_json(target_date=None, output_file=None):
         return None
 
 
-def generate_sprint_report_json(sprint_id, output_file=None):
-    """Generate JSON report for entire sprint.
+def generate_sprint_report_json(sprint_id=None, output_file=None, limit=10):
+    """Generate JSON report for sprints.
+    
+    By default, generates a multi-sprint report with the last 10 sprints (or fewer if less available).
+    If sprint_id is provided, generates a single-sprint report for backward compatibility.
     
     Args:
-        sprint_id: Sprint ID
+        sprint_id: Optional specific Sprint ID (if None, generates multi-sprint report)
+        output_file: Output file path (default: ux/web/data/sprint_activity_report.json)
+        limit: Maximum number of sprints for multi-sprint report (default: 10)
+    
+    Returns:
+        Path to generated file or None
+    """
+    if output_file is None:
+        output_file = "ux/web/data/sprint_activity_report.json"
+    
+    # If sprint_id is provided, generate single sprint report (backward compatibility)
+    if sprint_id is not None:
+        console.print(f"\n[bold cyan]Generating Sprint Activity Report for Sprint {sprint_id}...[/bold cyan]")
+        
+        # Query data
+        data = query_sprint_activity(sprint_id)
+        
+        if not data:
+            return None
+        
+        # Build JSON structure
+        tz = get_local_timezone()
+        report = {
+            "generated_at": datetime.now(tz).isoformat(),
+            "report_type": "sprint",
+            "metadata": data["sprint"],
+            "daily_breakdown": data["daily_breakdown"],
+            "developer_summary": data["developer_summary"],
+            "summary": data["summary"]
+        }
+        
+        # Ensure directory exists
+        os.makedirs(os.path.dirname(output_file), exist_ok=True)
+        
+        # Write JSON
+        try:
+            with open(output_file, 'w') as f:
+                json.dump(report, f, indent=2)
+            
+            console.print(f"[bold green]✓ Report generated: {output_file}[/bold green]")
+            console.print(f"[dim]  Sprint: {data['sprint']['name']}[/dim]")
+            console.print(f"[dim]  Total activity: {data['summary']['sprint_total_activity']} ({len(data['developer_summary'])} developers)[/dim]")
+            
+            return output_file
+        except Exception as e:
+            console.print(f"[bold red]Error writing JSON: {e}[/bold red]")
+            return None
+    else:
+        # Default to multi-sprint report
+        return generate_multi_sprint_report_json(limit=limit, output_file=output_file)
+
+
+def query_multi_sprint_activity(limit=10):
+    """Query activity for multiple sprints (last N sprints).
+    
+    Args:
+        limit: Maximum number of sprints to include (default: 10)
+    
+    Returns:
+        Dict with sprints list and overall summary, or None if no data
+    """
+    if not os.path.exists(DB_NAME):
+        console.print("[bold red]Database not found. Please run refresh first.[/bold red]")
+        return None
+    
+    from .refresh import get_available_sprints
+    
+    # Get available sprints (already sorted by start_date DESC)
+    available_sprints = get_available_sprints()
+    
+    if not available_sprints:
+        console.print("[yellow]No sprints found in database[/yellow]")
+        return None
+    
+    # Limit to requested number or available sprints, whichever is less
+    sprints_to_query = available_sprints[:min(limit, len(available_sprints))]
+    actual_count = len(sprints_to_query)
+    
+    console.print(f"[dim]Querying activity for {actual_count} sprint(s)...[/dim]")
+    
+    # Query each sprint
+    sprints_data = []
+    total_activity_across_sprints = 0
+    all_developers = {}
+    
+    for sprint_id, name, state, start_date, end_date in sprints_to_query:
+        sprint_activity = query_sprint_activity(sprint_id)
+        
+        if sprint_activity:
+            sprints_data.append(sprint_activity)
+            total_activity_across_sprints += sprint_activity['summary']['sprint_total_activity']
+            
+            # Aggregate developer participation
+            for dev in sprint_activity['developer_summary']:
+                dev_email = dev['email']
+                if dev_email not in all_developers:
+                    all_developers[dev_email] = {
+                        'name': dev['name'],
+                        'email': dev_email,
+                        'total_activity': 0,
+                        'sprints_participated': 0
+                    }
+                all_developers[dev_email]['total_activity'] += dev['sprint_total']
+                all_developers[dev_email]['sprints_participated'] += 1
+    
+    if not sprints_data:
+        console.print("[yellow]No activity data found for any sprint[/yellow]")
+        return None
+    
+    # Find most active sprint
+    most_active_sprint = max(sprints_data, key=lambda s: s['summary']['sprint_total_activity'])
+    
+    # Convert developer dict to sorted list
+    developer_participation = sorted(
+        all_developers.values(),
+        key=lambda d: d['total_activity'],
+        reverse=True
+    )
+    
+    # Calculate overall summary
+    avg_per_sprint = round(total_activity_across_sprints / len(sprints_data), 1) if sprints_data else 0
+    
+    result = {
+        'sprints': sprints_data,
+        'metadata': {
+            'sprint_count': len(sprints_data),
+            'requested_limit': limit,
+            'earliest_sprint': {
+                'id': sprints_data[-1]['sprint']['id'],
+                'name': sprints_data[-1]['sprint']['name'],
+                'start_date': sprints_data[-1]['sprint']['start_date']
+            } if sprints_data else None,
+            'latest_sprint': {
+                'id': sprints_data[0]['sprint']['id'],
+                'name': sprints_data[0]['sprint']['name'],
+                'start_date': sprints_data[0]['sprint']['start_date']
+            } if sprints_data else None
+        },
+        'overall_summary': {
+            'total_sprints': len(sprints_data),
+            'total_activity': total_activity_across_sprints,
+            'avg_per_sprint': avg_per_sprint,
+            'most_active_sprint': {
+                'id': most_active_sprint['sprint']['id'],
+                'name': most_active_sprint['sprint']['name'],
+                'activity': most_active_sprint['summary']['sprint_total_activity']
+            },
+            'unique_developers': len(developer_participation),
+            'developer_participation': developer_participation
+        }
+    }
+    
+    return result
+
+
+def generate_multi_sprint_report_json(limit=10, output_file=None):
+    """Generate JSON report for multiple sprints (last N sprints).
+    
+    Args:
+        limit: Maximum number of sprints to include (default: 10)
         output_file: Output file path (default: ux/web/data/sprint_activity_report.json)
     
     Returns:
@@ -467,10 +629,10 @@ def generate_sprint_report_json(sprint_id, output_file=None):
     if output_file is None:
         output_file = "ux/web/data/sprint_activity_report.json"
     
-    console.print(f"\n[bold cyan]Generating Sprint Activity Report for Sprint {sprint_id}...[/bold cyan]")
+    console.print(f"\n[bold cyan]Generating Multi-Sprint Activity Report (last {limit} sprints)...[/bold cyan]")
     
     # Query data
-    data = query_sprint_activity(sprint_id)
+    data = query_multi_sprint_activity(limit)
     
     if not data:
         return None
@@ -479,11 +641,10 @@ def generate_sprint_report_json(sprint_id, output_file=None):
     tz = get_local_timezone()
     report = {
         "generated_at": datetime.now(tz).isoformat(),
-        "report_type": "sprint",
-        "metadata": data["sprint"],
-        "daily_breakdown": data["daily_breakdown"],
-        "developer_summary": data["developer_summary"],
-        "summary": data["summary"]
+        "report_type": "multi_sprint",
+        "metadata": data["metadata"],
+        "sprints": data["sprints"],
+        "overall_summary": data["overall_summary"]
     }
     
     # Ensure directory exists
@@ -494,9 +655,10 @@ def generate_sprint_report_json(sprint_id, output_file=None):
         with open(output_file, 'w') as f:
             json.dump(report, f, indent=2)
         
-        console.print(f"[bold green]✓ Report generated: {output_file}[/bold green]")
-        console.print(f"[dim]  Sprint: {data['sprint']['name']}[/dim]")
-        console.print(f"[dim]  Total activity: {data['summary']['sprint_total_activity']} ({len(data['developer_summary'])} developers)[/dim]")
+        console.print(f"[bold green]✓ Multi-Sprint Report generated: {output_file}[/bold green]")
+        console.print(f"[dim]  Sprints included: {data['metadata']['sprint_count']}[/dim]")
+        console.print(f"[dim]  Total activity: {data['overall_summary']['total_activity']} ({data['overall_summary']['unique_developers']} developers)[/dim]")
+        console.print(f"[dim]  Date range: {data['metadata']['earliest_sprint']['start_date']} to {data['metadata']['latest_sprint']['start_date']}[/dim]")
         
         return output_file
     except Exception as e:
