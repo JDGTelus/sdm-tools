@@ -76,6 +76,12 @@
         border-top: 1px solid rgba(255, 255, 255, 0.2);
         font-size: 13px;
       }
+
+      .tooltip-average {
+        font-weight: bold;
+        font-size: 14px;
+        text-align: center;
+      }
     </style>
   </head>
   <body class="bg-gray-50">
@@ -94,7 +100,11 @@
         '#1ABC9C',  // Teal
       ];
 
-      // Line Chart Component with Enhanced Tooltip
+      // Average line colors
+      const SPRINT_AVG_COLOR = '#FF0000';      // Red for sprint average
+      const OVERALL_AVG_COLOR = '#000000';     // Black for overall average
+
+      // Line Chart Component with Enhanced Features
       const LineChart = ({ data, title, metricType, fullSprintData }) => {
         const chartRef = useRef(null);
         const chartInstance = useRef(null);
@@ -147,6 +157,10 @@
             return html;
           };
 
+          const buildAverageTooltip = (label, value) => {
+            return `<div class="tooltip-average">${label}<br/>${value.toFixed(1)} actions</div>`;
+          };
+
           const ctx = chartRef.current.getContext("2d");
           chartInstance.current = new Chart(ctx, {
             type: "line",
@@ -167,15 +181,16 @@
                   position: 'right',
                   labels: {
                     usePointStyle: true,
-                    padding: 10,
-                    font: { size: 11 }
+                    padding: 12,
+                    font: { size: 13, weight: '500' }
                   }
                 },
                 title: { 
                   display: true, 
                   text: title, 
-                  font: { size: 16, weight: 'bold' },
-                  color: '#1f2937'
+                  font: { size: 20, weight: 'bold' },
+                  color: '#1f2937',
+                  padding: { top: 10, bottom: 15 }
                 },
                 tooltip: {
                   enabled: false,
@@ -190,13 +205,19 @@
                     
                     if (tooltipModel.dataPoints && tooltipModel.dataPoints.length > 0) {
                       const datasetIndex = tooltipModel.dataPoints[0].datasetIndex;
-                      const developer = data.datasets[datasetIndex];
+                      const dataset = data.datasets[datasetIndex];
                       
-                      tooltipEl.innerHTML = buildDeveloperTooltip(
-                        developer.label,
-                        fullSprintData,
-                        metricType
-                      );
+                      // Check if it's an average line
+                      if (dataset.isAverage) {
+                        const avgValue = tooltipModel.dataPoints[0].parsed.y;
+                        tooltipEl.innerHTML = buildAverageTooltip(dataset.label, avgValue);
+                      } else {
+                        tooltipEl.innerHTML = buildDeveloperTooltip(
+                          dataset.label,
+                          fullSprintData,
+                          metricType
+                        );
+                      }
                       
                       const position = context.chart.canvas.getBoundingClientRect();
                       tooltipEl.style.display = 'block';
@@ -211,12 +232,12 @@
                   title: { 
                     display: true, 
                     text: 'Sprint',
-                    font: { size: 12, weight: 'bold' }
+                    font: { size: 14, weight: 'bold' }
                   },
                   ticks: { 
                     maxRotation: 45,
                     minRotation: 45,
-                    font: { size: 10 }
+                    font: { size: 12 }
                   },
                   grid: { color: '#e5e7eb' }
                 },
@@ -225,11 +246,11 @@
                   title: { 
                     display: true, 
                     text: 'Actions',
-                    font: { size: 12, weight: 'bold' }
+                    font: { size: 14, weight: 'bold' }
                   },
                   ticks: { 
                     color: '#6b7280',
-                    font: { size: 11 }
+                    font: { size: 12 }
                   },
                   grid: { color: '#e5e7eb' }
                 }
@@ -240,14 +261,26 @@
                   
                   chart.data.datasets.forEach((dataset, idx) => {
                     if (idx === datasetIndex) {
+                      // Hovered line: thicker and solid
                       dataset.borderWidth = 4;
                       dataset.pointRadius = 6;
+                      dataset.borderDash = [];  // Solid line
                     } else {
-                      dataset.borderWidth = 2;  // Fixed: stay at normal width
+                      // Non-hovered lines: normal width, stay dashed
+                      dataset.borderWidth = 2;
                       dataset.pointRadius = 4;
+                      dataset.borderDash = dataset.defaultBorderDash || [];
                     }
                   });
                   
+                  chart.update('none');
+                } else {
+                  // Reset all to default when not hovering
+                  chart.data.datasets.forEach(dataset => {
+                    dataset.borderWidth = 2;
+                    dataset.pointRadius = 4;
+                    dataset.borderDash = dataset.defaultBorderDash || [];
+                  });
                   chart.update('none');
                 }
               }
@@ -262,7 +295,7 @@
           };
         }, [data, title, metricType, fullSprintData]);
 
-        return <canvas ref={chartRef} className="w-full" style={{ height: '400px' }}></canvas>;
+        return <canvas ref={chartRef} className="w-full" style={{ height: '450px' }}></canvas>;
       };
 
       // Sprint Activity Table Component (Heatmap style) with Updated Colors
@@ -385,7 +418,7 @@
         const [chartData, setChartData] = useState(null);
         const [tableData, setTableData] = useState(null);
 
-        // Prepare line chart data
+        // Prepare line chart data with average lines
         const prepareLineChartData = (report, metricType) => {
           const sprintLabels = report.sprints.map(s => s.sprint.name.replace('DevicesTITAN_', ''));
           
@@ -397,6 +430,7 @@
             )
           ];
           
+          // Create dataset for each developer (dashed lines)
           const datasets = developerEmails.map((email, idx) => {
             const devName = report.sprints
               .flatMap(s => s.developer_summary)
@@ -420,11 +454,73 @@
               borderColor: DEVELOPER_COLORS[idx % DEVELOPER_COLORS.length],
               backgroundColor: DEVELOPER_COLORS[idx % DEVELOPER_COLORS.length],
               borderWidth: 2,
-              tension: 0.3,
+              tension: 0,  // Straight lines (not curved)
+              borderDash: [5, 5],  // Dashed line
+              defaultBorderDash: [5, 5],  // Store default for reset
               pointRadius: 4,
               pointHoverRadius: 6,
               pointBackgroundColor: DEVELOPER_COLORS[idx % DEVELOPER_COLORS.length],
+              isAverage: false
             };
+          });
+          
+          // Calculate sprint averages (average per sprint across all developers)
+          const sprintAverages = report.sprints.map(sprint => {
+            const values = sprint.developer_summary.map(dev => {
+              switch(metricType) {
+                case 'jira': return dev.sprint_jira;
+                case 'git': return dev.sprint_git;
+                case 'total': return dev.sprint_total;
+                default: return 0;
+              }
+            });
+            return values.reduce((sum, v) => sum + v, 0) / values.length;
+          });
+          
+          // Calculate overall average (average across all sprints and developers)
+          const allValues = report.sprints.flatMap(sprint => 
+            sprint.developer_summary.map(dev => {
+              switch(metricType) {
+                case 'jira': return dev.sprint_jira;
+                case 'git': return dev.sprint_git;
+                case 'total': return dev.sprint_total;
+                default: return 0;
+              }
+            })
+          );
+          const overallAverage = allValues.reduce((sum, v) => sum + v, 0) / allValues.length;
+          const overallAverages = new Array(report.sprints.length).fill(overallAverage);
+          
+          // Add sprint average line (red, dashed)
+          datasets.push({
+            label: 'Sprint Average',
+            data: sprintAverages,
+            borderColor: SPRINT_AVG_COLOR,
+            backgroundColor: SPRINT_AVG_COLOR,
+            borderWidth: 2,
+            tension: 0,
+            borderDash: [10, 5],  // Dashed
+            defaultBorderDash: [10, 5],
+            pointRadius: 4,
+            pointHoverRadius: 6,
+            pointBackgroundColor: SPRINT_AVG_COLOR,
+            isAverage: true
+          });
+          
+          // Add overall average line (black, dashed)
+          datasets.push({
+            label: 'Overall Average',
+            data: overallAverages,
+            borderColor: OVERALL_AVG_COLOR,
+            backgroundColor: OVERALL_AVG_COLOR,
+            borderWidth: 2,
+            tension: 0,
+            borderDash: [3, 3],  // Dashed
+            defaultBorderDash: [3, 3],
+            pointRadius: 0,  // No points for overall average
+            pointHoverRadius: 4,
+            pointBackgroundColor: OVERALL_AVG_COLOR,
+            isAverage: true
           });
           
           return {
@@ -528,8 +624,8 @@
               </p>
             </div>
 
-            {/* Three Line Charts with Enhanced Tooltips */}
-            <div className="grid grid-cols-1 gap-6 mb-8">
+            {/* Three Line Charts with Enhanced Tooltips - Responsive Grid */}
+            <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 mb-8">
               <div className="bg-white rounded-lg shadow-lg p-6">
                 <LineChart
                   data={chartData.jiraData}
@@ -546,7 +642,7 @@
                   fullSprintData={data}
                 />
               </div>
-              <div className="bg-white rounded-lg shadow-lg p-6">
+              <div className="bg-white rounded-lg shadow-lg p-6 xl:col-span-2">
                 <LineChart
                   data={chartData.totalData}
                   title="Total Actions by Sprint"
