@@ -132,6 +132,7 @@ def handle_generate_reports():
         generate_daily_report_json,
         generate_sprint_report_json,
     )
+    from .database.standalone import generate_standalone_report
     from .database import get_available_sprints
     from datetime import datetime, date
     
@@ -142,9 +143,10 @@ def handle_generate_reports():
         console.print("[bold yellow]Generate Activity Report:[/bold yellow]\n")
         console.print("[bold cyan]1. Single day report (default: today)[/bold cyan]")
         console.print("[bold cyan]2. Full sprint report[/bold cyan]")
-        console.print("[bold cyan]3. Back to main menu[/bold cyan]")
+        console.print("[bold cyan]3. Generate standalone report (dist/)[/bold cyan]")
+        console.print("[bold cyan]4. Back to main menu[/bold cyan]")
         
-        choice = console.input("\n[bold green]Enter your choice (1/2/3): [/bold green]").strip()
+        choice = console.input("\n[bold green]Enter your choice (1/2/3/4): [/bold green]").strip()
         
         if choice == "1":
             # Single day report
@@ -202,6 +204,28 @@ def handle_generate_reports():
             input("\nPress Enter to continue...")
             
         elif choice == "3":
+            # Generate standalone report
+            console.print("\n[bold cyan]═══════════════════════════════════════════════[/bold cyan]")
+            console.print("[bold cyan]        GENERATE STANDALONE REPORT[/bold cyan]")
+            console.print("[bold cyan]═══════════════════════════════════════════════[/bold cyan]\n")
+            
+            console.print("[dim]This will create self-contained HTML files in dist/[/dim]")
+            console.print("[dim]All data and styling will be inlined.[/dim]")
+            console.print("[dim]Files will still require network access for CDN libraries.\n[/dim]")
+            
+            files = generate_standalone_report()
+            
+            if files:
+                console.print(f"\n[bold green]✓ Standalone report(s) generated successfully![/bold green]\n")
+                for f in files:
+                    console.print(f"  [bold white]→ {f}[/bold white]")
+                console.print(f"\n[dim]You can open these files directly in your browser.[/dim]")
+            else:
+                console.print("[bold red]Failed to generate standalone reports.[/bold red]")
+            
+            input("\nPress Enter to continue...")
+            
+        elif choice == "4":
             break
         else:
             console.print("[bold red]Invalid choice.[/bold red]")
