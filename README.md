@@ -5,6 +5,7 @@ SDM-Tools is a command-line interface (CLI) tool designed for Software Developer
 ## Features
 
 ### Core Functionality
+
 - **Jira Integration**: Fetch and store Jira issues with customizable JQL queries
 - **Commit Tracking**: Fetch and store commit information from ALL branches in local git repositories
 - **Comprehensive Coverage**: Captures commits from feature branches, remote branches, and all refs
@@ -13,6 +14,7 @@ SDM-Tools is a command-line interface (CLI) tool designed for Software Developer
 - **Pagination**: Display large datasets with colorful, paginated output
 
 ### Daily Activity Report
+
 - **Time-Bucketed Analysis**: Activity broken down by 2-hour intervals throughout the workday
   - 8am-10am, 10am-12pm, 12pm-2pm, 2pm-4pm, 4pm-6pm
 - **Off-Hours Tracking**: Identify and quantify work done outside standard hours (6pm-8am)
@@ -35,6 +37,7 @@ SDM-Tools is a command-line interface (CLI) tool designed for Software Developer
 ### Jira API Token
 
 To generate a Jira API token:
+
 1. Log in to your Jira account
 2. Navigate to your account settings
 3. Find the "API tokens" section
@@ -44,6 +47,7 @@ To generate a Jira API token:
 ### Virtual Environment Setup
 
 1. **Create a virtual environment**:
+
    ```bash
    python3 -m venv .venv
    ```
@@ -68,20 +72,22 @@ To generate a Jira API token:
 Set the following environment variables for configuration:
 
 #### Required Variables
+
 - `JIRA_URL`: Base URL for Jira API (e.g., `https://your-jira-domain.atlassian.net`)
 - `JIRA_API_TOKEN`: API token for authentication
 - `JIRA_EMAIL`: Email associated with the Jira account
 - `JQL_QUERY`: JQL query to filter issues (e.g., `project = "SET" AND component = "IOTMI 3P Connector"`)
-- `DISPLAY_COLUMNS`: Comma-separated list of columns to display (e.g., `id,summary,description,assignee,reporter,status`)
 - `REPO_PATH`: Path to the local repository (e.g., `/path/to/repo`)
 
 #### Optional Variables (with defaults)
+
 - `DB_NAME`: Name of the SQLite database file (default: `data/sdm_tools.db`)
 - `TABLE_NAME`: Name of the table to store issues (default: `iotmi_3p_issues`)
 - `INCLUDED_EMAILS`: Comma-separated list of email addresses to include in reports (default: all)
 - `TIMEZONE`: Timezone for activity bucketing (default: system timezone)
 
 #### Additional Variables
+
 - `REPO_NAME`: Name of the repository for reference (e.g., `your-repo-name`)
 
 ### Example Configuration
@@ -94,7 +100,6 @@ export JIRA_URL='https://your-jira-domain.atlassian.net'
 export JIRA_API_TOKEN='your-api-token'
 export JIRA_EMAIL='your-email@example.com'
 export JQL_QUERY='project = "SET" AND component = "IOTMI 3P Connector" AND type = "Story"'
-export DISPLAY_COLUMNS='id,summary,description,assignee,reporter,status'
 export DB_NAME='data/sdm_tools.db'
 export TABLE_NAME='iotmi_3p_issues'
 export REPO_PATH='/path/to/repo'
@@ -108,6 +113,7 @@ export TIMEZONE='America/Toronto'
 ### Running the CLI Tool
 
 1. **Load environment variables**:
+
    ```bash
    set -a; source .env; set +a
    ```
@@ -168,7 +174,9 @@ The `INCLUDED_EMAILS` environment variable controls which developers appear in r
 SDM Tools generates multiple types of interactive HTML dashboards with **consistent UX design**:
 
 #### Daily Activity Dashboard
+
 Provides comprehensive time-based analysis for a single day:
+
 - **Time Buckets**: Activity in 2-hour intervals (8am-10am, 10am-12pm, etc.)
 - **Activity Heatmap**: Color-coded table showing developer intensity
 - **Interactive Charts**: Bar charts, doughnut charts, developer rankings
@@ -176,21 +184,27 @@ Provides comprehensive time-based analysis for a single day:
 - **Complete Team Roster**: Shows ALL active developers, including those with zero activity
 
 #### Sprint Activity Dashboard
+
 Multi-sprint trend analysis and visualization:
+
 - **Trend Charts**: Line charts showing activity progression across sprints
 - **Sprint Comparison**: Compare activity across multiple sprints
 - **Heatmap Table**: Developer activity by sprint
 - **Statistical Averages**: Sprint and overall averages
 
 #### Sprint Velocity Dashboard
+
 Planned vs delivered story points analysis:
+
 - **Velocity Trends**: Line charts showing sprint completion rates
 - **Comparison Table**: Planned vs delivered points per sprint
 - **Metrics Cards**: Total planned, delivered, completion rate, variance
 - **Historical Analysis**: Track velocity trends across multiple sprints
 
 #### Bundled SPA Report
+
 Single-file application combining all reports:
+
 - **Dynamic Discovery**: Automatically includes all reports from `dist/`
 - **Side Navigation**: Toggle between different report views
 - **Default Landing**: First report (alphabetically) shown by default
@@ -199,17 +213,20 @@ Single-file application combining all reports:
 #### Viewing Reports
 
 **Standalone Reports** (in `ux/web/`):
+
 - Open `ux/web/daily-activity-dashboard.html` for daily view
 - Open `ux/web/sprint-activity-dashboard.html` for sprint view
 - Requires data files in `ux/web/data/`
 
 **Bundled Reports** (in `dist/`):
+
 1. Generate standalone reports (CLI Option 2 → 4)
 2. Generate bundle (CLI Option 2 → 5)
 3. Open `dist/reports-bundle.html` in browser
 4. Use sidebar to navigate between reports
 
 All dashboards feature:
+
 - **Consistent UX Design**: Homogenized headers and footers across all dashboards
 - Self-contained with embedded React, Chart.js, and TailwindCSS
 - Responsive design for desktop, tablet, and mobile
@@ -223,6 +240,7 @@ All dashboards feature:
 ### Time Buckets
 
 The tool tracks activity in the following time buckets (based on configured timezone):
+
 - **8am-10am**: 08:00-09:59
 - **10am-12pm**: 10:00-11:59
 - **12pm-2pm**: 12:00-13:59
@@ -233,6 +251,7 @@ The tool tracks activity in the following time buckets (based on configured time
 ### Activity Tracking
 
 For each developer and time bucket, the tool tracks:
+
 - **Jira Actions**: Issues created, updated, status changes
 - **Repo Actions**: Commits made
 - **Total Activity**: Combined Jira and repo actions
@@ -240,17 +259,16 @@ For each developer and time bucket, the tool tracks:
 ### Generated Files
 
 The tool generates:
+
 - **Data Files** (`ux/web/data/`):
   - `daily_activity_report.json`: Daily activity data
   - `sprint_activity_report.json`: Multi-sprint data
   - `sprint_velocity_report.json`: Velocity metrics data
-  
 - **Standalone Reports** (`dist/`):
   - `daily-activity-dashboard.html`: Self-contained daily report
   - `sprint-activity-dashboard.html`: Self-contained sprint report
   - `sprint-velocity-dashboard.html`: Self-contained velocity report
   - `reports-bundle.html`: Bundled SPA with all reports
-  
 - **Database**:
   - `data/sdm_tools.db`: SQLite database with normalized data
   - Automated backups: `data/sdm_tools_backup_*.db` (keeps last 5)
@@ -329,6 +347,7 @@ sdm-tools/
 ### Current Status (November 19, 2025)
 
 ✅ **Recent Improvements**:
+
 - Daily reports now show ALL active developers (including zero-activity)
 - Sprint velocity dashboard UX homologized with other dashboards
 - Backend properly queries all active developers before overlaying activity
@@ -336,6 +355,7 @@ sdm-tools/
 - Consistent header/footer design across all three dashboards
 
 ✅ **Working Features**:
+
 - Normalized database with 8 tables for optimal performance
 - Complete branch tracking with `git log --all`
 - Email normalization and alias matching
