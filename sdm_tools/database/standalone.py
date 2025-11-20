@@ -750,6 +750,20 @@ def _build_dynamic_bundle_template(embedded_data, reports_metadata, components_c
         
         const [currentView, setCurrentView] = useState('{default_view}');
         const [sidebarOpen, setSidebarOpen] = useState(true);
+        
+        // Render the appropriate dashboard based on current view
+        const renderDashboard = () => {{
+          if (currentView === 'daily' && EMBEDDED_DATA.daily) {{
+            return <DailyActivityDashboard />;
+          }} else if (currentView === 'sprint' && EMBEDDED_DATA.sprint) {{
+            return <SprintActivityDashboard />;
+          }} else if (currentView === 'velocity' && EMBEDDED_DATA.velocity) {{
+            return <App />;
+          }}
+          return <div className="flex items-center justify-center h-screen">
+            <div className="text-xl text-gray-600">No data available for this view</div>
+          </div>;
+        }};
 
         return (
           <>
@@ -761,8 +775,7 @@ def _build_dynamic_bundle_template(embedded_data, reports_metadata, components_c
               reports={{reportsMetadata}}
             />
             <div className={{`main-content ${{sidebarOpen ? 'with-sidebar-open' : 'with-sidebar-closed'}}`}}>
-              {{currentView === 'daily' && EMBEDDED_DATA.daily && <DailyActivityDashboard />}}
-              {{currentView === 'sprint' && EMBEDDED_DATA.sprint && <SprintActivityDashboard />}}
+              {{renderDashboard()}}
             </div>
           </>
         );

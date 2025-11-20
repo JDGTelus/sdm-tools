@@ -91,10 +91,15 @@
                   borderColor: PLANNED_COLOR,
                   backgroundColor: 'rgba(75, 0, 130, 0.1)',
                   borderWidth: 2,
-                  tension: 0.3,
+                  borderDash: [5, 5],
+                  tension: 0,
                   pointRadius: 4,
                   pointHoverRadius: 6,
                   pointBackgroundColor: PLANNED_COLOR,
+                  pointBorderColor: PLANNED_COLOR,
+                  pointHoverBorderWidth: 2,
+                  hoverBorderWidth: 3,
+                  hoverBorderDash: [],
                   fill: false
                 },
                 {
@@ -103,10 +108,15 @@
                   borderColor: DELIVERED_COLOR,
                   backgroundColor: 'rgba(102, 204, 0, 0.1)',
                   borderWidth: 2,
-                  tension: 0.3,
+                  borderDash: [5, 5],
+                  tension: 0,
                   pointRadius: 4,
                   pointHoverRadius: 6,
                   pointBackgroundColor: DELIVERED_COLOR,
+                  pointBorderColor: DELIVERED_COLOR,
+                  pointHoverBorderWidth: 2,
+                  hoverBorderWidth: 3,
+                  hoverBorderDash: [],
                   fill: false
                 },
                 {
@@ -118,7 +128,8 @@
                   borderDash: [10, 5],
                   tension: 0,
                   pointRadius: 0,
-                  pointHoverRadius: 2
+                  pointHoverRadius: 2,
+                  hoverBorderWidth: 2
                 },
                 {
                   label: `Avg Delivered (${avgDelivered} pts)`,
@@ -129,7 +140,8 @@
                   borderDash: [10, 5],
                   tension: 0,
                   pointRadius: 0,
-                  pointHoverRadius: 2
+                  pointHoverRadius: 2,
+                  hoverBorderWidth: 2
                 }
               ]
             },
