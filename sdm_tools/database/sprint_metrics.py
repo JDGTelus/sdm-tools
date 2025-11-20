@@ -101,7 +101,9 @@ def calculate_sprint_velocity(sprint_id=None, limit=10):
         FROM sprints s
         LEFT JOIN issue_sprints isp ON s.id = isp.sprint_id
         LEFT JOIN issues i ON isp.issue_id = i.id
+        LEFT JOIN developers d ON i.assignee_id = d.id
         {full_where}
+        AND (d.active = 1 OR i.assignee_id IS NULL)
         GROUP BY s.id, s.name, s.start_date_local, s.end_date_local, s.state
         ORDER BY s.start_date_local DESC
         {limit_clause}
