@@ -154,7 +154,6 @@
               </thead>
               <tbody>
                 {developers
-                  .filter((d) => d.daily_total.total > 0)
                   .slice(0, 15)
                   .map((dev, idx) => (
                     <tr key={idx} className="border-t hover:bg-gray-50">
@@ -318,14 +317,12 @@
 
         const developerComparisonData = {
           labels: data.developers
-            .filter((d) => d.daily_total.total > 0)
             .slice(0, 10)
             .map((d) => d.name.split(" ")[0]),
           datasets: [
             {
               label: "Jira",
               data: data.developers
-                .filter((d) => d.daily_total.total > 0)
                 .slice(0, 10)
                 .map((d) => d.daily_total.jira),
               backgroundColor: "#4B0082",
@@ -333,7 +330,6 @@
             {
               label: "Repo",
               data: data.developers
-                .filter((d) => d.daily_total.total > 0)
                 .slice(0, 10)
                 .map((d) => d.daily_total.git),
               backgroundColor: "#66CC00",

@@ -33,7 +33,32 @@ def query_daily_activity(target_date):
     cursor = conn.cursor()
     
     try:
-        # Get all activity for the date
+        # First, get all active developers
+        cursor.execute("""
+            SELECT id, name, email
+            FROM developers
+            WHERE active = 1
+            ORDER BY name
+        """)
+        
+        all_active_devs = cursor.fetchall()
+        
+        if not all_active_devs:
+            console.print(f"[yellow]No active developers configured[/yellow]")
+            return None
+        
+        # Initialize structure for all active developers
+        developers_dict = {}
+        for dev_id, name, email in all_active_devs:
+            developers_dict[dev_id] = {
+                "name": name,
+                "email": email,
+                "buckets": {bucket: {"jira": 0, "git": 0, "total": 0} for bucket in ["8am-10am", "10am-12pm", "12pm-2pm", "2pm-4pm", "4pm-6pm"]},
+                "off_hours": {"jira": 0, "git": 0, "total": 0},
+                "daily_total": {"jira": 0, "git": 0, "total": 0}
+            }
+        
+        # Now get activity for the date
         cursor.execute("""
             SELECT 
                 d.id, d.name, d.email,
@@ -50,14 +75,9 @@ def query_daily_activity(target_date):
         
         rows = cursor.fetchall()
         
-        if not rows:
-            console.print(f"[yellow]No activity found for {target_date}[/yellow]")
-            return None
-        
-        # Build developer activity structure
-        developers_dict = {}
         sprint_context = None
         
+        # Add activity data to the developer structures
         for row in rows:
             dev_id, name, email, time_bucket, jira, git, total, sprint_id, sprint_name, sprint_state = row
             
@@ -69,17 +89,7 @@ def query_daily_activity(target_date):
                     "state": sprint_state
                 }
             
-            # Initialize developer entry if needed
-            if dev_id not in developers_dict:
-                developers_dict[dev_id] = {
-                    "name": name,
-                    "email": email,
-                    "buckets": {bucket: {"jira": 0, "git": 0, "total": 0} for bucket in ["8am-10am", "10am-12pm", "12pm-2pm", "2pm-4pm", "4pm-6pm"]},
-                    "off_hours": {"jira": 0, "git": 0, "total": 0},
-                    "daily_total": {"jira": 0, "git": 0, "total": 0}
-                }
-            
-            # Add activity to appropriate bucket
+            # Add activity to appropriate bucket (developer already initialized)
             if time_bucket == "off_hours":
                 developers_dict[dev_id]["off_hours"]["jira"] += jira
                 developers_dict[dev_id]["off_hours"]["git"] += git
@@ -111,7 +121,11 @@ def query_daily_activity(target_date):
             else:
                 bucket_totals[bucket] = sum(d['buckets'][bucket]['total'] for d in developers_list)
         
-        most_active_bucket = max(bucket_totals.items(), key=lambda x: x[1])[0] if bucket_totals else "N/A"
+        # Find most active bucket (handle case where all buckets are zero)
+        if bucket_totals and any(count > 0 for count in bucket_totals.values()):
+            most_active_bucket = max(bucket_totals.items(), key=lambda x: x[1])[0]
+        else:
+            most_active_bucket = "N/A"
         off_hours_total = bucket_totals.get('off_hours', 0)
         off_hours_pct = round((off_hours_total / total_activity * 100), 1) if total_activity > 0 else 0
         
