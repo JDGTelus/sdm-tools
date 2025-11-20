@@ -142,9 +142,30 @@ The CLI provides the following options:
 
 5. **Exit**
 
+### Managing Team Membership
+
+**INCLUDED_EMAILS Configuration:**
+
+The `INCLUDED_EMAILS` environment variable controls which developers appear in reports:
+
+1. **Update Team Members**:
+   - Edit `.env` file to modify `INCLUDED_EMAILS`
+   - Reload environment: `set -a; source .env; set +a`
+   - Run "Refresh All Data" (Option 1) to update the database
+
+2. **How It Works**:
+   - During refresh, developers matching `INCLUDED_EMAILS` are marked as `active = 1`
+   - All reports filter by `active = 1` automatically
+   - Zero-activity developers are shown in reports (since Nov 19, 2025)
+
+3. **Email Normalization**:
+   - System handles AWS SSO prefixes, domain variations, numeric suffixes
+   - All emails normalized to lowercase
+   - Automatic matching between Jira and Git identities
+
 ### Activity Dashboards
 
-SDM Tools generates multiple types of interactive HTML dashboards:
+SDM Tools generates multiple types of interactive HTML dashboards with **consistent UX design**:
 
 #### Daily Activity Dashboard
 Provides comprehensive time-based analysis for a single day:
@@ -152,6 +173,7 @@ Provides comprehensive time-based analysis for a single day:
 - **Activity Heatmap**: Color-coded table showing developer intensity
 - **Interactive Charts**: Bar charts, doughnut charts, developer rankings
 - **Off-Hours Tracking**: Work done outside standard hours
+- **Complete Team Roster**: Shows ALL active developers, including those with zero activity
 
 #### Sprint Activity Dashboard
 Multi-sprint trend analysis and visualization:
@@ -159,6 +181,13 @@ Multi-sprint trend analysis and visualization:
 - **Sprint Comparison**: Compare activity across multiple sprints
 - **Heatmap Table**: Developer activity by sprint
 - **Statistical Averages**: Sprint and overall averages
+
+#### Sprint Velocity Dashboard
+Planned vs delivered story points analysis:
+- **Velocity Trends**: Line charts showing sprint completion rates
+- **Comparison Table**: Planned vs delivered points per sprint
+- **Metrics Cards**: Total planned, delivered, completion rate, variance
+- **Historical Analysis**: Track velocity trends across multiple sprints
 
 #### Bundled SPA Report
 Single-file application combining all reports:
@@ -175,16 +204,19 @@ Single-file application combining all reports:
 - Requires data files in `ux/web/data/`
 
 **Bundled Reports** (in `dist/`):
-1. Generate standalone reports (CLI Option 2 → 3)
-2. Generate bundle (CLI Option 2 → 4)
+1. Generate standalone reports (CLI Option 2 → 4)
+2. Generate bundle (CLI Option 2 → 5)
 3. Open `dist/reports-bundle.html` in browser
 4. Use sidebar to navigate between reports
 
 All dashboards feature:
+- **Consistent UX Design**: Homogenized headers and footers across all dashboards
 - Self-contained with embedded React, Chart.js, and TailwindCSS
 - Responsive design for desktop, tablet, and mobile
 - Works offline (CDN libraries require internet)
 - All data embedded at generation time
+- Full-width gradient headers with container-based layouts
+- GitHub link footer with SDM Tools attribution
 
 ## Data Structure
 
@@ -208,17 +240,20 @@ For each developer and time bucket, the tool tracks:
 ### Generated Files
 
 The tool generates:
-- **Data Files**:
-  - `ux/web/data/daily_activity_report.json`: Daily activity data
-  - `ux/web/data/sprint_activity_report.json`: Multi-sprint data
+- **Data Files** (`ux/web/data/`):
+  - `daily_activity_report.json`: Daily activity data
+  - `sprint_activity_report.json`: Multi-sprint data
+  - `sprint_velocity_report.json`: Velocity metrics data
   
 - **Standalone Reports** (`dist/`):
   - `daily-activity-dashboard.html`: Self-contained daily report
   - `sprint-activity-dashboard.html`: Self-contained sprint report
+  - `sprint-velocity-dashboard.html`: Self-contained velocity report
   - `reports-bundle.html`: Bundled SPA with all reports
   
 - **Database**:
   - `data/sdm_tools.db`: SQLite database with normalized data
+  - Automated backups: `data/sdm_tools_backup_*.db` (keeps last 5)
 
 ## File Structure
 
@@ -286,8 +321,103 @@ sdm-tools/
 
 - If developers are missing from the report, check the `INCLUDED_EMAILS` configuration
 - Ensure email addresses in Jira match those in git commit history
-- Check that the target date has actual activity (commits and/or Jira updates)
+- **Note**: Zero-activity developers WILL appear in reports (as of Nov 19, 2025)
+- To update team members: modify `.env` and run "Refresh All Data"
+
+## Codebase Health & Next Steps
+
+### Current Status (November 19, 2025)
+
+✅ **Recent Improvements**:
+- Daily reports now show ALL active developers (including zero-activity)
+- Sprint velocity dashboard UX homologized with other dashboards
+- Backend properly queries all active developers before overlaying activity
+- Frontend filters removed to display complete team roster
+- Consistent header/footer design across all three dashboards
+
+✅ **Working Features**:
+- Normalized database with 8 tables for optimal performance
+- Complete branch tracking with `git log --all`
+- Email normalization and alias matching
+- Pre-aggregated daily activity summary (50-100x faster queries)
+- Standalone and bundled report generation
+- Sprint velocity tracking with planned vs delivered metrics
+
+### Recommended Next Steps
+
+#### High Priority
+
+1. **Add Automated Testing**
+   - Create pytest suite for database modules
+   - Test email normalization edge cases
+   - Test report generation with various data scenarios
+   - Add integration tests for Jira/Git fetching
+
+2. **Code Quality Tools**
+   - Configure `black` for consistent formatting
+   - Add `ruff` for fast linting
+   - Set up pre-commit hooks for automatic formatting
+   - Add type hints and run `mypy` for type checking
+
+3. **Error Handling Improvements**
+   - Add retry logic for Jira API calls
+   - Better handling of missing/invalid environment variables
+   - Graceful degradation when Git repo is unavailable
+   - Validate JQL queries before executing
+
+#### Medium Priority
+
+4. **Performance Monitoring**
+   - Add timing metrics to database queries
+   - Log performance statistics during refresh
+   - Monitor memory usage during large data imports
+   - Optimize chart rendering for large datasets
+
+5. **Configuration Management**
+   - Validate `.env` file on startup
+   - Provide helpful error messages for missing vars
+   - Add configuration templates for common setups
+   - Support multiple team configurations
+
+6. **Documentation**
+   - Add inline code comments for complex algorithms
+   - Create architecture diagram showing data flow
+   - Document database schema with entity-relationship diagram
+   - Add troubleshooting guide for common issues
+
+#### Low Priority
+
+7. **Feature Enhancements**
+   - Export reports to PDF format
+   - Add email digest functionality
+   - Support multiple Jira projects
+   - Add custom time bucket configurations
+   - Historical trend analysis across quarters
+
+8. **UI/UX Improvements**
+   - Add dark mode toggle
+   - Improve mobile responsiveness
+   - Add data export (CSV/JSON) from dashboards
+   - Interactive date range selectors
+
+### Code Smell Watch List
+
+- **Database module coupling**: Consider breaking down large modules (reports.py is 500+ lines)
+- **Configuration scattered**: Consolidate all config validation in one place
+- **Error messages**: Standardize error message format across modules
+- **Magic numbers**: Extract time bucket definitions to constants
+- **Duplicate code**: Some chart generation logic is repeated across dashboards
+
+### Technical Debt
+
+- No automated tests (manual testing only)
+- No linting or formatting enforcement
+- No CI/CD pipeline
+- Limited input validation
+- Hard-coded chart colors and styles
+- Bundle generation relies on regex parsing (fragile)
 
 ---
 
-**Feedback**: juan.gramajo@telus.com
+**Feedback & Contributions**: juan.gramajo@telus.com  
+**Repository**: https://github.com/JDGTelus/sdm-tools

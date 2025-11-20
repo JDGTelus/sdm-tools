@@ -89,13 +89,41 @@ New normalized tables:
 
 ### Recent Enhancements (November 2025)
 
-#### Sprint Dashboard Homologation
+#### November 19, 2025 - Complete Team Visibility & UX Homologation
+
+**Zero-Activity Developer Visibility**:
+- Daily activity reports now show ALL active developers from INCLUDED_EMAILS
+- Backend: Modified `query_daily_activity()` to fetch all active developers first, then overlay activity data
+- Frontend: Removed `.filter(d => d.daily_total.total > 0)` from heatmap table and charts
+- Result: Developers with zero activity are visible with all-zero stats (not hidden)
+- Use case: Managers can see complete team roster daily, identifying who worked and who didn't
+
+**Sprint Velocity Dashboard UX Homologation**:
+- Updated header to match daily and sprint activity dashboards
+  - Changed from `<header>` with `max-w-7xl` to `<div>` with `gradient-bg` class
+  - Title size increased from `text-3xl` to `text-4xl font-bold mb-4`
+  - Padding changed from `py-6` to `py-12` for full-width gradient effect
+  - Subtitle now `text-xl opacity-90` (consistent with other dashboards)
+- Updated footer to match standard pattern
+  - Removed `<footer>` with `bg-gray-100 border-t`
+  - Now uses simple `<div>` with `mt-16 text-center text-gray-600 pb-8`
+  - Added 📈 emoji icon and GitHub link to SDM Tools
+- Changed main content from `<main>` with `max-w-7xl` to `<div>` with `container mx-auto px-6`
+- All three dashboards now have identical UX patterns
+
+**Technical Details**:
+- `reports.py:36-96`: Complete rewrite of developer initialization logic
+- `daily-activity-dashboard.html:157,321,328,336`: Removed activity filters
+- `sprint-velocity-dashboard.html:414-427,494-509`: Header and footer homologation
+- Reports now properly handle edge cases (no activity, all zeros, etc.)
+
+#### Sprint Dashboard Homologation (November 18, 2025)
 - Updated sprint dashboard header to match daily dashboard styling
 - Full-width gradient header with container wrapper
 - Consistent footer with GitHub link and icon
 - Proper gray background and spacing throughout
 
-#### Bundled SPA Architecture
+#### Bundled SPA Architecture (November 2025)
 - Bundle generation now extracts from standalone reports in `dist/`
 - Dynamic discovery of all HTML reports (no hardcoding)
 - First report (alphabetically) becomes default landing view
