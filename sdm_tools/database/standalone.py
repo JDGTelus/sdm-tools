@@ -370,24 +370,22 @@ def _extract_css_from_standalone(filepath):
     with open(filepath, 'r') as f:
         content = f.read()
     
-    # Pattern: <style>/* Inlined from ... */\n{css content}</style>
-    pattern = r'<style>\s*/\* Inlined from.*?\*/\s*(.*?)</style>'
-    match = re.search(pattern, content, re.DOTALL)
-    
-    if match:
-        return match.group(1).strip()
-    
-    # Fallback: try to get any style content between tailwind config and custom tooltip styles
-    # Look for the main shared styles section
-    pattern = r'</script>\s*<style>(.*?)</style>'
+    # Extract ALL <style> blocks from the file (except TailwindCSS config)
+    # Pattern: <style>...content...</style>
+    pattern = r'<style>(.*?)</style>'
     matches = re.findall(pattern, content, re.DOTALL)
     
-    if matches:
-        # Return the first substantial style block
-        for css in matches:
-            css = css.strip()
-            if len(css) > 100:  # Substantial CSS content
-                return css
+    css_blocks = []
+    for css in matches:
+        css = css.strip()
+        # Skip TailwindCSS config blocks (they contain JavaScript)
+        if 'tailwind.config' in css or len(css) < 50:
+            continue
+        css_blocks.append(css)
+    
+    # Join all CSS blocks with newlines
+    if css_blocks:
+        return '\n\n'.join(css_blocks)
     
     return ""
 
