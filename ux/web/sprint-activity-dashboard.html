@@ -157,8 +157,46 @@
             return html;
           };
 
-          const buildAverageTooltip = (label, value) => {
-            return `<div class="tooltip-average">${label}<br/>${value.toFixed(1)} actions</div>`;
+          const buildAverageTooltip = (label, value, sprintData, metricType) => {
+            // For Sprint Average, show all datapoint values
+            if (label === 'Sprint Average') {
+              // Calculate per-sprint averages
+              const sprintAverages = sprintData.sprints.map(sprint => {
+                const values = sprint.developer_summary.map(dev => {
+                  switch(metricType) {
+                    case 'jira': return dev.sprint_jira;
+                    case 'git': return dev.sprint_git;
+                    case 'total': return dev.sprint_total;
+                    default: return 0;
+                  }
+                });
+                const avg = values.reduce((sum, v) => sum + v, 0) / values.length;
+                return {
+                  sprintName: sprint.sprint.name.replace('DevicesTITAN_', ''),
+                  average: avg
+                };
+              });
+              
+              // Build HTML with all sprint averages
+              let html = `<div class="tooltip-header">${label}</div>`;
+              
+              sprintAverages.forEach(s => {
+                html += `
+                  <div class="tooltip-row">
+                    <span class="sprint-name">${s.sprintName}:</span>
+                    <span class="sprint-data">${s.average.toFixed(1)}</span>
+                  </div>
+                `;
+              });
+              
+              const totalAvg = sprintAverages.reduce((sum, s) => sum + s.average, 0) / sprintAverages.length;
+              html += `<div class="tooltip-total">Overall Avg: ${totalAvg.toFixed(1)} actions</div>`;
+              
+              return html;
+            } else {
+              // For Overall Average, keep simple single value display
+              return `<div class="tooltip-average">${label}<br/>${value.toFixed(1)} actions</div>`;
+            }
           };
 
           const ctx = chartRef.current.getContext("2d");
@@ -210,7 +248,7 @@
                       // Check if it's an average line
                       if (dataset.isAverage) {
                         const avgValue = tooltipModel.dataPoints[0].parsed.y;
-                        tooltipEl.innerHTML = buildAverageTooltip(dataset.label, avgValue);
+                        tooltipEl.innerHTML = buildAverageTooltip(dataset.label, avgValue, fullSprintData, metricType);
                       } else {
                         tooltipEl.innerHTML = buildDeveloperTooltip(
                           dataset.label,

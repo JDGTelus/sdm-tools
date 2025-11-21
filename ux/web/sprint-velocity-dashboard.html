@@ -170,30 +170,7 @@
                   padding: { top: 10, bottom: 15 }
                 },
                 tooltip: {
-                  backgroundColor: 'rgba(0, 0, 0, 0.8)',
-                  padding: 12,
-                  titleFont: { size: 14, weight: 'bold' },
-                  bodyFont: { size: 13 },
-                  callbacks: {
-                    label: function(context) {
-                      const label = context.dataset.label || '';
-                      const value = context.parsed.y;
-                      if (label.includes('Avg')) {
-                        return `${label}`;
-                      }
-                      return `${label}: ${value} points`;
-                    },
-                    afterLabel: function(context) {
-                      const sprintIndex = context.dataIndex;
-                      const sprint = data.sprints[sprintIndex];
-                      if (!sprint || context.dataset.label.includes('Avg')) return '';
-                      
-                      return [
-                        `Completion: ${sprint.completion_rate}%`,
-                        `Issues: ${sprint.completed_issues}/${sprint.total_issues}`
-                      ];
-                    }
-                  }
+                  enabled: false  // Disable all tooltips on line hover
                 }
               },
               scales: {
