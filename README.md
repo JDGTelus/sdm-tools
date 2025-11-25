@@ -1,443 +1,503 @@
 # SDM-Tools
 
-SDM-Tools is a command-line interface (CLI) tool designed for Software Developer Managers (SDMs) to analyze daily developer activity across Jira and repository commits. The tool generates a standalone HTML report showing time-bucketed activity analysis for your team.
+A command-line interface (CLI) tool for Software Developer Managers to analyze team activity across Jira and Git repositories. Generates interactive HTML dashboards with time-bucketed activity analysis, sprint metrics, and velocity tracking.
+
+## Quick Start
+
+```bash
+# 1. Install dependencies
+pip install -r requirements.txt
+
+# 2. Configure environment
+cp .env.example .env  # Edit with your settings
+set -a; source .env; set +a
+
+# 3. Run CLI
+python -m sdm_tools.cli
+```
 
 ## Features
 
-### Core Functionality
+### Three Interactive Dashboards
 
-- **Jira Integration**: Fetch and store Jira issues with customizable JQL queries
-- **Commit Tracking**: Fetch and store commit information from ALL branches in local git repositories
-- **Comprehensive Coverage**: Captures commits from feature branches, remote branches, and all refs
-- **Normalized Database**: Efficient schema with email auto-mapping and sprint-based filtering
-- **Data Persistence**: SQLite database for fast access and reliability
-- **Pagination**: Display large datasets with colorful, paginated output
+**📅 Daily Activity Dashboard**
 
-### Daily Activity Report
+- Time-bucketed activity (2-hour intervals: 8am-10am, 10am-12pm, etc.)
+- Activity heatmap with color-coded intensity
+- Off-hours tracking (6pm-8am)
+- Interactive charts (stacked bar, doughnut, rankings)
+- Shows ALL active developers (including zero-activity)
 
-- **Time-Bucketed Analysis**: Activity broken down by 2-hour intervals throughout the workday
-  - 8am-10am, 10am-12pm, 12pm-2pm, 2pm-4pm, 4pm-6pm
-- **Off-Hours Tracking**: Identify and quantify work done outside standard hours (6pm-8am)
-- **Activity Heatmap**: Color-coded visualization showing activity intensity per developer and time bucket
-- **Interactive Charts**:
-  - Activity by Time Bucket (stacked bar chart)
-  - Regular vs Off-Hours Activity (doughnut chart)
-  - Developer Rankings (vertical bar chart)
-- **Standalone HTML Dashboard**: Self-contained report with embedded React, Chart.js, and all data
-- **Timezone Support**: Respects configured timezone for accurate time bucket assignment
+**📊 Sprint Activity Dashboard**
 
-## Setup
+- Multi-sprint trend analysis (last 10 sprints)
+- Line charts showing activity progression
+- Sprint comparison and averages
+- Developer activity heatmap by sprint
+
+**📈 Sprint Velocity Dashboard**
+
+- Planned vs delivered story points
+- Completion rate trends
+- Metrics cards (total planned, delivered, variance)
+- Historical velocity analysis
+
+**🎯 Bundled SPA**
+
+- Single HTML file (~140 KB)
+- All 3 dashboards with sidebar navigation
+- Fully portable, works offline (CDN libs need internet)
+- Same consistent UX across all dashboards
+
+### Core Capabilities
+
+- **Jira Integration**: Fetch issues via customizable JQL queries
+- **Git Tracking**: Comprehensive commit history from ALL branches
+- **Normalized Database**: 8-table SQLite schema for optimal performance
+- **Email Normalization**: Handles AWS SSO prefixes, domain variations, aliases
+- **Timezone Support**: Accurate time bucket assignment
+- **Data Persistence**: SQLite with automated backups (keeps last 5)
+- **Pre-aggregation**: 50-100x faster queries via daily_activity_summary table
+
+## Installation
 
 ### Prerequisites
 
-- Python 3.6 or higher
+- Python 3.6+
 - Jira account with API access
-- Local git repository with commit history
+- Local Git repository
 
-### Jira API Token
+### Setup
 
-To generate a Jira API token:
-
-1. Log in to your Jira account
-2. Navigate to your account settings
-3. Find the "API tokens" section
-4. Generate a new API token and copy it
-5. Set the `JIRA_API_TOKEN` environment variable with the copied token
-
-### Virtual Environment Setup
-
-1. **Create a virtual environment**:
+1. **Create virtual environment**:
 
    ```bash
    python3 -m venv .venv
+   source .venv/bin/activate  # Windows: .venv\Scripts\activate
    ```
 
-2. **Activate the virtual environment**:
-   - On macOS/Linux:
-     ```bash
-     source .venv/bin/activate
-     ```
-   - On Windows:
-     ```bash
-     .venv\Scripts\activate
-     ```
+2. **Install dependencies**:
 
-3. **Install Python dependencies**:
    ```bash
    pip install -r requirements.txt
    ```
 
-### Environment Variables
+3. **Configure environment** (create `.env` file):
 
-Set the following environment variables for configuration:
+   ```bash
+   # Required
+   export JIRA_URL='https://your-domain.atlassian.net'
+   export JIRA_API_TOKEN='your-api-token'
+   export JIRA_EMAIL='your-email@example.com'
+   export JQL_QUERY='project = "YOUR_PROJECT" AND component = "YOUR_COMPONENT"'
+   export REPO_PATH='/path/to/your/repo'
+   export INCLUDED_EMAILS='dev1@example.com,dev2@example.com'
 
-#### Required Variables
+   # Optional (with defaults)
+   export DB_NAME='data/sdm_tools.db'
+   export TIMEZONE='America/Toronto'  # or your timezone
+   export REPO_NAME='your-repo-name'
+   ```
 
-- `JIRA_URL`: Base URL for Jira API (e.g., `https://your-jira-domain.atlassian.net`)
-- `JIRA_API_TOKEN`: API token for authentication
-- `JIRA_EMAIL`: Email associated with the Jira account
-- `JQL_QUERY`: JQL query to filter issues (e.g., `project = "SET" AND component = "IOTMI 3P Connector"`)
-- `REPO_PATH`: Path to the local repository (e.g., `/path/to/repo`)
-
-#### Optional Variables (with defaults)
-
-- `DB_NAME`: Name of the SQLite database file (default: `data/sdm_tools.db`)
-- `TABLE_NAME`: Name of the table to store issues (default: `iotmi_3p_issues`)
-- `INCLUDED_EMAILS`: Comma-separated list of email addresses to include in reports (default: all)
-- `TIMEZONE`: Timezone for activity bucketing (default: system timezone)
-
-#### Additional Variables
-
-- `REPO_NAME`: Name of the repository for reference (e.g., `your-repo-name`)
-
-### Example Configuration
-
-Create a `.env` file in the project root:
-
-```bash
-#!/bin/bash
-export JIRA_URL='https://your-jira-domain.atlassian.net'
-export JIRA_API_TOKEN='your-api-token'
-export JIRA_EMAIL='your-email@example.com'
-export JQL_QUERY='project = "SET" AND component = "IOTMI 3P Connector" AND type = "Story"'
-export DB_NAME='data/sdm_tools.db'
-export TABLE_NAME='iotmi_3p_issues'
-export REPO_PATH='/path/to/repo'
-export REPO_NAME='your-repo-name'
-export INCLUDED_EMAILS='alice@example.com,bob@example.com'
-export TIMEZONE='America/Toronto'
-```
+4. **Get Jira API token**:
+   - Log in to Jira → Account Settings → Security → API Tokens → Create
+   - Copy token to `JIRA_API_TOKEN` in `.env`
 
 ## Usage
 
-### Running the CLI Tool
+### CLI Workflow
 
-1. **Load environment variables**:
+```bash
+# Load environment
+set -a; source .env; set +a
 
-   ```bash
-   set -a; source .env; set +a
-   ```
+# Run CLI
+python -m sdm_tools.cli
+```
 
-2. **Run the CLI tool**:
-   ```bash
-   python -m sdm_tools.cli
-   ```
-
-### Menu Options
-
-The CLI provides the following options:
+**Menu Options:**
 
 1. **Refresh All Data (Jira + Git → Normalize)**
-   - Complete data refresh workflow
-   - Fetches from Jira and Git repositories
+   - Complete data refresh
+   - Fetches from Jira and Git
    - Normalizes and processes all data
+   - Run this first time or for full refresh
 
 2. **Generate Activity Reports**
-   - **Single day report**: Time-bucketed activity for a specific date
-   - **Full sprint report**: Multi-sprint activity trends and analysis
-   - **Standalone reports**: Self-contained HTML files in `dist/`
-   - **Bundled SPA**: Single-file app combining all reports with navigation
+   - Single day report (today or specific date)
+   - Full sprint report (last 10 sprints)
+   - Sprint velocity report
+   - Generate standalone reports (3 HTML files in `dist/`)
+   - **Generate bundled SPA** (single file with all 3 dashboards)
 
 3. **View Sprints**
-   - List all available sprints with metadata
-   - View sprint dates and status
+   - List all available sprints
+   - Shows dates and status
 
 4. **View Active Developers**
    - List configured active developers
-   - Based on `INCLUDED_EMAILS` configuration
+   - Based on `INCLUDED_EMAILS`
 
 5. **Exit**
 
-### Managing Team Membership
+### Programmatic Usage
 
-**INCLUDED_EMAILS Configuration:**
+```python
+from sdm_tools.database.reports import (
+    generate_daily_report_json,
+    generate_sprint_report_json,
+    generate_sprint_velocity_report
+)
+from sdm_tools.database.standalone import (
+    generate_all_standalone_reports,
+    generate_bundle_spa
+)
 
-The `INCLUDED_EMAILS` environment variable controls which developers appear in reports:
+# Generate data files
+generate_daily_report_json()
+generate_sprint_report_json()
+generate_sprint_velocity_report()
 
-1. **Update Team Members**:
-   - Edit `.env` file to modify `INCLUDED_EMAILS`
-   - Reload environment: `set -a; source .env; set +a`
-   - Run "Refresh All Data" (Option 1) to update the database
+# Generate standalone HTML files
+generate_all_standalone_reports()
 
-2. **How It Works**:
-   - During refresh, developers matching `INCLUDED_EMAILS` are marked as `active = 1`
-   - All reports filter by `active = 1` automatically
-   - Zero-activity developers are shown in reports (since Nov 19, 2025)
+# Generate bundle (all 3 dashboards)
+generate_bundle_spa()
+```
 
-3. **Email Normalization**:
-   - System handles AWS SSO prefixes, domain variations, numeric suffixes
-   - All emails normalized to lowercase
-   - Automatic matching between Jira and Git identities
+## Configuration
 
-### Activity Dashboards
+### Environment Variables
 
-SDM Tools generates multiple types of interactive HTML dashboards with **consistent UX design**:
+**Required:**
 
-#### Daily Activity Dashboard
+- `JIRA_URL`: Base URL for Jira API
+- `JIRA_API_TOKEN`: API token for authentication
+- `JIRA_EMAIL`: Email associated with Jira account
+- `JQL_QUERY`: JQL query to filter issues
+- `REPO_PATH`: Path to local Git repository
+- `INCLUDED_EMAILS`: Comma-separated list of developer emails
 
-Provides comprehensive time-based analysis for a single day:
+**Optional:**
 
-- **Time Buckets**: Activity in 2-hour intervals (8am-10am, 10am-12pm, etc.)
-- **Activity Heatmap**: Color-coded table showing developer intensity
-- **Interactive Charts**: Bar charts, doughnut charts, developer rankings
-- **Off-Hours Tracking**: Work done outside standard hours
-- **Complete Team Roster**: Shows ALL active developers, including those with zero activity
+- `DB_NAME`: SQLite database file path (default: `data/sdm_tools.db`)
+- `TIMEZONE`: Timezone for activity bucketing (default: `America/Mexico_City`)
+- `TABLE_NAME`: Jira issues table name (default: `iotmi_3p_issues`)
+- `REPO_NAME`: Repository name for reference
 
-#### Sprint Activity Dashboard
+### Team Management
 
-Multi-sprint trend analysis and visualization:
+The `INCLUDED_EMAILS` variable controls which developers appear in reports:
 
-- **Trend Charts**: Line charts showing activity progression across sprints
-- **Sprint Comparison**: Compare activity across multiple sprints
-- **Heatmap Table**: Developer activity by sprint
-- **Statistical Averages**: Sprint and overall averages
+1. Edit `.env` file to modify `INCLUDED_EMAILS`
+2. Reload environment: `set -a; source .env; set +a`
+3. Run "Refresh All Data" to update the database
+4. All reports will filter by `active = 1` (developers in INCLUDED_EMAILS)
 
-#### Sprint Velocity Dashboard
+**Email Normalization** handles:
 
-Planned vs delivered story points analysis:
+- AWS SSO prefixes: `AWSReservedSSO_*/user@domain.com` → `user@domain.com`
+- Domain variations: `@telusinternational.com` → `@telus.com`
+- Numeric suffixes: `user01@domain.com` → `user@domain.com`
+- Case normalization: all lowercase
 
-- **Velocity Trends**: Line charts showing sprint completion rates
-- **Comparison Table**: Planned vs delivered points per sprint
-- **Metrics Cards**: Total planned, delivered, completion rate, variance
-- **Historical Analysis**: Track velocity trends across multiple sprints
+## Architecture
 
-#### Bundled SPA Report
+### Database Schema (8 tables)
 
-Single-file application combining all reports:
+```
+developers                    # Developer registry
+developer_email_aliases       # Email variations for matching
+sprints                       # Sprint metadata
+issues                        # Jira issues (simplified)
+issue_sprints                 # Many-to-many issue-sprint relationship
+jira_events                   # Jira activity events with time buckets
+git_events                    # Git commit events with sprint assignment
+daily_activity_summary        # Pre-aggregated materialized view (fast queries)
+```
 
-- **Dynamic Discovery**: Automatically includes all reports from `dist/`
-- **Side Navigation**: Toggle between different report views
-- **Default Landing**: First report (alphabetically) shown by default
-- **Fully Portable**: Single HTML file with all data embedded
+### File Structure
 
-#### Viewing Reports
+```
+sdm-tools/
+├── sdm_tools/
+│   ├── cli.py                      # Main CLI interface
+│   ├── config.py                   # Environment configuration
+│   ├── jira.py                     # Jira API client
+│   ├── repo.py                     # Git repository client
+│   ├── utils.py                    # Utility functions
+│   └── database/
+│       ├── core.py                 # Database utilities
+│       ├── schema.py               # 8-table schema definition
+│       ├── reports.py              # Report query functions
+│       ├── standalone.py           # Standalone + bundle generation
+│       ├── refresh.py              # Data refresh workflow
+│       ├── issues.py               # Jira issue management
+│       ├── commits.py              # Git commit management
+│       ├── sprints.py              # Sprint processing
+│       ├── sprint_metrics.py       # Velocity calculations
+│       ├── queries.py              # Query helpers
+│       └── normalizers/            # Data normalization (7 files)
+├── ux/web/                         # Dashboard templates
+│   ├── daily-activity-dashboard.html
+│   ├── sprint-activity-dashboard.html
+│   ├── sprint-velocity-dashboard.html
+│   ├── shared-dashboard-styles.css
+│   └── data/                       # Generated JSON files
+│       ├── daily_activity_report.json
+│       ├── sprint_activity_report.json
+│       └── sprint_velocity_report.json
+├── dist/                           # Generated standalone reports
+│   ├── daily-activity-dashboard.html      (self-contained)
+│   ├── sprint-activity-dashboard.html     (self-contained)
+│   ├── sprint-velocity-dashboard.html     (self-contained)
+│   └── reports-bundle.html                (all 3 dashboards)
+├── data/
+│   ├── sdm_tools.db                # SQLite database
+│   └── sdm_tools_backup_*.db       # Automated backups (last 5)
+├── requirements.txt
+├── .env
+└── README.md
+```
 
-**Standalone Reports** (in `ux/web/`):
+### Data Flow
 
-- Open `ux/web/daily-activity-dashboard.html` for daily view
-- Open `ux/web/sprint-activity-dashboard.html` for sprint view
-- Requires data files in `ux/web/data/`
+```
+Jira API + Git Repo
+       ↓
+  Fetch Data
+       ↓
+  8-Table Database (normalized)
+       ↓
+  Query Functions (reports.py)
+       ↓
+  Generate JSON Files (ux/web/data/)
+       ↓
+  Generate Standalone HTML (dist/*.html)
+       ↓
+  Extract & Bundle (dist/reports-bundle.html)
+```
 
-**Bundled Reports** (in `dist/`):
+## Time Buckets
 
-1. Generate standalone reports (CLI Option 2 → 4)
-2. Generate bundle (CLI Option 2 → 5)
-3. Open `dist/reports-bundle.html` in browser
-4. Use sidebar to navigate between reports
-
-All dashboards feature:
-
-- **Consistent UX Design**: Homogenized headers and footers across all dashboards
-- Self-contained with embedded React, Chart.js, and TailwindCSS
-- Responsive design for desktop, tablet, and mobile
-- Works offline (CDN libraries require internet)
-- All data embedded at generation time
-- Full-width gradient headers with container-based layouts
-- GitHub link footer with SDM Tools attribution
-
-## Data Structure
-
-### Time Buckets
-
-The tool tracks activity in the following time buckets (based on configured timezone):
+Activity tracked in configurable timezone:
 
 - **8am-10am**: 08:00-09:59
 - **10am-12pm**: 10:00-11:59
 - **12pm-2pm**: 12:00-13:59
 - **2pm-4pm**: 14:00-15:59
 - **4pm-6pm**: 16:00-17:59
-- **Off-Hours**: 18:00 previous day to 07:59 current day
+- **Off-Hours**: 18:00 to 07:59 (previous/next day)
 
-### Activity Tracking
-
-For each developer and time bucket, the tool tracks:
+Each bucket tracks:
 
 - **Jira Actions**: Issues created, updated, status changes
-- **Repo Actions**: Commits made
-- **Total Activity**: Combined Jira and repo actions
+- **Git Actions**: Commits made
+- **Total Activity**: Combined Jira + Git
 
-### Generated Files
+## Generated Reports
 
-The tool generates:
+### Standalone Reports (3 files)
 
-- **Data Files** (`ux/web/data/`):
-  - `daily_activity_report.json`: Daily activity data
-  - `sprint_activity_report.json`: Multi-sprint data
-  - `sprint_velocity_report.json`: Velocity metrics data
-- **Standalone Reports** (`dist/`):
-  - `daily-activity-dashboard.html`: Self-contained daily report
-  - `sprint-activity-dashboard.html`: Self-contained sprint report
-  - `sprint-velocity-dashboard.html`: Self-contained velocity report
-  - `reports-bundle.html`: Bundled SPA with all reports
-- **Database**:
-  - `data/sdm_tools.db`: SQLite database with normalized data
-  - Automated backups: `data/sdm_tools_backup_*.db` (keeps last 5)
+Self-contained HTML files with embedded data:
 
-## File Structure
+- Data inlined from JSON files
+- CSS inlined from shared stylesheet
+- CDN libraries (React, Chart.js, TailwindCSS)
+- Can be shared independently
 
-```
-sdm-tools/
-├── sdm_tools/              # Main Python package
-│   ├── database/           # Database modules
-│   │   ├── core.py        # Core database utilities
-│   │   ├── issues.py      # Jira issues management
-│   │   ├── commits.py     # Git commits management
-│   │   ├── sprints.py     # Sprint data processing
-│   │   ├── normalize.py   # Data normalization
-│   │   ├── reports.py     # Report generation
-│   │   ├── standalone.py  # Standalone HTML generation
-│   │   └── refresh.py     # Data refresh workflow
-│   ├── cli.py             # CLI interface
-│   ├── config.py          # Configuration management
-│   ├── jira.py            # Jira API integration
-│   ├── repo.py            # Git repository integration
-│   └── utils.py           # Utility functions
-├── ux/web/                 # Web dashboards (templates)
-│   ├── daily-activity-dashboard.html
-│   ├── sprint-activity-dashboard.html
-│   ├── shared-dashboard-styles.css
-│   └── data/              # Generated JSON files
-│       ├── daily_activity_report.json
-│       └── sprint_activity_report.json
-├── dist/                   # Standalone reports (generated)
-│   ├── daily-activity-dashboard.html
-│   ├── sprint-activity-dashboard.html
-│   └── reports-bundle.html
-├── data/                   # SQLite database
-│   └── sdm_tools.db
-├── requirements.txt        # Python dependencies
-├── .env                   # Environment configuration
-└── README.md             # This file
-```
+### Bundled SPA (1 file)
 
-## Notes
+Single-page application combining all 3 dashboards:
 
-- **Configuration**: All required environment variables must be set before running the tool
-- **Data Persistence**: All data is stored in SQLite database for fast access and reliability
-- **Timezone Awareness**: Activity buckets respect configured timezone for accurate tracking
-- **Offline Capable**: The HTML dashboard works without internet connectivity
-- **Self-Contained Report**: All data is embedded at generation time, no external API calls
-- **Complete Commit Tracking**: Uses `git log --all` to capture commits from all branches, including feature branches that may not be merged yet. This ensures comprehensive developer activity tracking.
+- Dynamic sidebar navigation
+- All data embedded (~25 KB data)
+- Total file size: ~140 KB
+- Fully portable
+- Same consistent UX
+
+## Performance
+
+**Tested with real data** (Nov 25, 2025):
+
+- 4 active developers
+- 10 sprints
+- 659 activity events
+- Date range: July 16 - Nov 25, 2025
+
+**Metrics**:
+
+- Report generation: ~2 seconds
+- Standalone generation: ~1 second
+- Bundle generation: ~1 second
+- Query speed: <0.1s (pre-aggregated table)
+- Database size: Varies by data volume
 
 ## Troubleshooting
 
 ### Common Issues
 
-1. **Missing Environment Variables**: Ensure all required variables are set in your `.env` file
-2. **Jira Connection Issues**: Verify your API token and URL are correct
-3. **Repository Access**: Ensure the `REPO_PATH` points to a valid Git repository
-4. **File Permissions**: Check that the tool has write access to create database and output files
+**Missing Environment Variables**
 
-### Daily Activity Report
+- Ensure all required variables are set in `.env`
+- Use `set -a; source .env; set +a` to load
 
-- If report generation fails, ensure both Jira issues and git commits have been fetched first (options 1 and 2)
-- The dashboard will show "no data" if `daily_activity_report.json` is missing - generate it using option 3
-- For future dates, the tool will reject the request - only historical and current day reports are allowed
-- Verify `TIMEZONE` environment variable matches your team's working timezone
+**Jira Connection Issues**
 
-### Data Issues
+- Verify `JIRA_URL` is correct (include https://)
+- Check `JIRA_API_TOKEN` is valid (regenerate if needed)
+- Test `JIRA_EMAIL` matches your Jira account
 
-- If developers are missing from the report, check the `INCLUDED_EMAILS` configuration
-- Ensure email addresses in Jira match those in git commit history
-- **Note**: Zero-activity developers WILL appear in reports (as of Nov 19, 2025)
-- To update team members: modify `.env` and run "Refresh All Data"
+**Repository Access**
 
-## Codebase Health & Next Steps
+- Ensure `REPO_PATH` points to valid Git repository
+- Check file permissions for read access
 
-### Current Status (November 19, 2025)
+**Report Generation Fails**
 
-✅ **Recent Improvements**:
+- Run "Refresh All Data" first (Option 1)
+- Check console output for specific errors
+- Verify database file exists: `data/sdm_tools.db`
 
-- Daily reports now show ALL active developers (including zero-activity)
+**Developers Missing from Reports**
+
+- Check `INCLUDED_EMAILS` configuration
+- Verify email addresses match Jira/Git records
+- Run "Refresh All Data" after changing `INCLUDED_EMAILS`
+
+**Dashboard Shows No Data**
+
+- Ensure JSON files exist in `ux/web/data/`
+- Check that data refresh completed successfully
+- Verify target date has activity
+
+### Verification Commands
+
+```bash
+# Test full workflow
+python << 'EOF'
+from sdm_tools.database.reports import *
+from sdm_tools.database.standalone import *
+
+print("1. Daily:", generate_daily_report_json())
+print("2. Sprint:", generate_sprint_report_json())
+print("3. Velocity:", generate_sprint_velocity_report())
+print("4. Standalone:", len(generate_all_standalone_reports()), "files")
+print("5. Bundle:", generate_bundle_spa())
+print("✅ All tests passed!")
+EOF
+
+# Verify output files
+ls -lh dist/*.html
+
+# Open bundle
+open dist/reports-bundle.html
+```
+
+## Advanced Features
+
+### Database Backups
+
+Automatic backups during refresh:
+
+- Creates timestamped backup: `sdm_tools_backup_YYYYMMDD_HHMMSS.db`
+- Keeps last 5 backups automatically
+- Located in same directory as database
+
+### Complete Branch Tracking
+
+Uses `git log --all` to capture commits from:
+
+- Feature branches
+- Remote branches
+- All refs
+- Ensures comprehensive developer activity tracking
+
+### Sprint Assignment
+
+Events automatically assigned to sprints based on:
+
+- Jira sprint field (for issues)
+- Event date matching sprint date range (for commits)
+- Sprint context preserved in reports
+
+## Development
+
+See `AGENTS.md` for development guidelines including:
+
+- Build/lint/test commands
+- Code style conventions
+- Database patterns
+- Development workflow
+- Architecture notes
+
+## System Status
+
+**Current Version**: Production-ready (Nov 25, 2025)
+
+**Verified Working**:
+
+- ✅ All 3 dashboards generate correctly
+- ✅ Bundle includes all dashboards with navigation
+- ✅ Data refresh workflow functional
+- ✅ Email normalization working
+- ✅ Time bucket calculation accurate
+- ✅ Sprint metrics calculation correct
+
+**Recent Improvements** (Nov 19, 2025):
+
+- Daily reports show ALL active developers (including zero-activity)
 - Sprint velocity dashboard UX homologized with other dashboards
-- Backend properly queries all active developers before overlaying activity
-- Frontend filters removed to display complete team roster
 - Consistent header/footer design across all three dashboards
+- Complete team roster visibility
 
-✅ **Working Features**:
+**Known Working Features**:
 
-- Normalized database with 8 tables for optimal performance
-- Complete branch tracking with `git log --all`
+- 8-table normalized database
+- Complete branch tracking (`git log --all`)
 - Email normalization and alias matching
-- Pre-aggregated daily activity summary (50-100x faster queries)
+- Pre-aggregated daily activity summary (50-100x faster)
 - Standalone and bundled report generation
-- Sprint velocity tracking with planned vs delivered metrics
+- Sprint velocity tracking
 
-### Recommended Next Steps
+## Future Enhancements
 
-#### High Priority
+**High Priority**:
 
-1. **Add Automated Testing**
-   - Create pytest suite for database modules
-   - Test email normalization edge cases
-   - Test report generation with various data scenarios
-   - Add integration tests for Jira/Git fetching
+- Add automated testing (pytest suite)
+- Code quality tools (black, ruff, mypy)
+- Better error handling (retry logic, validation)
 
-2. **Code Quality Tools**
-   - Configure `black` for consistent formatting
-   - Add `ruff` for fast linting
-   - Set up pre-commit hooks for automatic formatting
-   - Add type hints and run `mypy` for type checking
+**Medium Priority**:
 
-3. **Error Handling Improvements**
-   - Add retry logic for Jira API calls
-   - Better handling of missing/invalid environment variables
-   - Graceful degradation when Git repo is unavailable
-   - Validate JQL queries before executing
+- Performance monitoring
+- Configuration validation
+- Architecture diagrams
 
-#### Medium Priority
+**Low Priority**:
 
-4. **Performance Monitoring**
-   - Add timing metrics to database queries
-   - Log performance statistics during refresh
-   - Monitor memory usage during large data imports
-   - Optimize chart rendering for large datasets
+- PDF export
+- Email digest functionality
+- Dark mode toggle
+- Custom time buckets
 
-5. **Configuration Management**
-   - Validate `.env` file on startup
-   - Provide helpful error messages for missing vars
-   - Add configuration templates for common setups
-   - Support multiple team configurations
+## Support
 
-6. **Documentation**
-   - Add inline code comments for complex algorithms
-   - Create architecture diagram showing data flow
-   - Document database schema with entity-relationship diagram
-   - Add troubleshooting guide for common issues
+**Questions or Issues?**
 
-#### Low Priority
+- Review this README for common solutions
+- Check `AGENTS.md` for development guidelines
+- Contact: juan.gramajo@telus.com
 
-7. **Feature Enhancements**
-   - Export reports to PDF format
-   - Add email digest functionality
-   - Support multiple Jira projects
-   - Add custom time bucket configurations
-   - Historical trend analysis across quarters
+**Contributing**:
 
-8. **UI/UX Improvements**
-   - Add dark mode toggle
-   - Improve mobile responsiveness
-   - Add data export (CSV/JSON) from dashboards
-   - Interactive date range selectors
-
-### Code Smell Watch List
-
-- **Database module coupling**: Consider breaking down large modules (reports.py is 500+ lines)
-- **Configuration scattered**: Consolidate all config validation in one place
-- **Error messages**: Standardize error message format across modules
-- **Magic numbers**: Extract time bucket definitions to constants
-- **Duplicate code**: Some chart generation logic is repeated across dashboards
-
-### Technical Debt
-
-- No automated tests (manual testing only)
-- No linting or formatting enforcement
-- No CI/CD pipeline
-- Limited input validation
-- Hard-coded chart colors and styles
-- Bundle generation relies on regex parsing (fragile)
+- Follow guidelines in `AGENTS.md`
+- Test changes thoroughly
+- Maintain existing functionality
+- Update documentation
 
 ---
 
-**Feedback & Contributions**: juan.gramajo@telus.com  
-**Repository**: https://github.com/JDGTelus/sdm-tools
+**Repository**: https://github.com/JDGTelus/sdm-tools  
+**License**: Internal TELUS tool  
+**Maintainer**: Juan Gramajo (juan.gramajo@telus.com)
