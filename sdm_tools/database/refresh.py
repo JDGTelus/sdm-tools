@@ -7,7 +7,7 @@ from datetime import datetime
 from rich.console import Console
 from ..config import DB_NAME
 from .schema import create_normalized_schema, drop_all_tables, get_table_stats
-from .normalize import normalize_all_data
+from .normalizers import normalize_all_data
 
 console = Console()
 

@@ -14,7 +14,7 @@ from .stats import (
 )
 from .sprints import process_sprints_from_issues, display_sprints_table
 from .schema import create_normalized_schema, drop_all_tables, get_table_stats
-from .normalize import normalize_all_data
+from .normalizers import normalize_all_data
 from .refresh import (
     refresh_database_workflow,
     backup_database,
@@ -49,6 +49,7 @@ __all__ = [
     "create_normalized_schema",
     "drop_all_tables",
     "get_table_stats",
+    # Normalization
     "normalize_all_data",
     "refresh_database_workflow",
     "backup_database",
