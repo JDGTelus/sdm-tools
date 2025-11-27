@@ -46,21 +46,21 @@
           if (chartInstance.current) chartInstance.current.destroy();
 
           const ctx = chartRef.current.getContext('2d');
-          
+
           // Prepare labels (sprint names)
           const labels = data.sprints.map(s => s.name.replace('DevicesTITAN_', ''));
-          
+
           // Prepare data points
           const plannedPoints = data.sprints.map(s => s.planned_points);
           const deliveredPoints = data.sprints.map(s => s.delivered_points);
-          
+
           // Calculate average lines
           const avgPlanned = data.metadata.avg_planned_per_sprint;
           const avgDelivered = data.metadata.avg_delivered_per_sprint;
-          
+
           // Calculate dynamic Y-axis range to center data in middle
           const allPoints = [
-            ...plannedPoints, 
+            ...plannedPoints,
             ...deliveredPoints,
             avgPlanned,
             avgDelivered
@@ -68,18 +68,18 @@
           const maxPoint = Math.max(...allPoints);
           const minPoint = Math.min(...allPoints);
           const dataRange = maxPoint - minPoint;
-          
+
           // Add padding above and below data (40% padding on each side)
           // This keeps lines centered in the middle of the chart
           const padding = dataRange * 0.8;
-          
+
           // Center the range around the middle of the data
           const dataMidpoint = (maxPoint + minPoint) / 2;
-          
+
           // Set range with padding
           const suggestedMin = Math.max(0, Math.floor(dataMidpoint - (dataRange / 2) - padding));
           const suggestedMax = Math.ceil(dataMidpoint + (dataRange / 2) + padding);
-          
+
           chartInstance.current = new Chart(ctx, {
             type: 'line',
             data: {
@@ -162,9 +162,9 @@
                     font: { size: 13, weight: '500' }
                   }
                 },
-                title: { 
-                  display: true, 
-                  text: 'Sprint Velocity: Planned vs Delivered Story Points', 
+                title: {
+                  display: true,
+                  text: 'Sprint Velocity: Planned vs Delivered Story Points',
                   font: { size: 20, weight: 'bold' },
                   color: '#1f2937',
                   padding: { top: 10, bottom: 15 }
@@ -175,12 +175,12 @@
               },
               scales: {
                 x: {
-                  title: { 
-                    display: true, 
+                  title: {
+                    display: true,
                     text: 'Sprint',
                     font: { size: 14, weight: 'bold' }
                   },
-                  ticks: { 
+                  ticks: {
                     maxRotation: 45,
                     minRotation: 45,
                     font: { size: 12 }
@@ -191,12 +191,12 @@
                   beginAtZero: false,
                   suggestedMin: suggestedMin,
                   suggestedMax: suggestedMax,
-                  title: { 
-                    display: true, 
+                  title: {
+                    display: true,
                     text: 'Story Points',
                     font: { size: 14, weight: 'bold' }
                   },
-                  ticks: { 
+                  ticks: {
                     color: '#6b7280',
                     font: { size: 12 }
                   },
@@ -435,8 +435,8 @@
                     Completion Rate
                   </div>
                   <div className={`text-3xl font-bold ${
-                    data.metadata.overall_completion_rate >= 80 ? 'text-green-600' : 
-                    data.metadata.overall_completion_rate >= 60 ? 'text-yellow-600' : 
+                    data.metadata.overall_completion_rate >= 80 ? 'text-green-600' :
+                    data.metadata.overall_completion_rate >= 60 ? 'text-yellow-600' :
                     'text-red-600'
                   }`}>
                     {data.metadata.overall_completion_rate}%
@@ -451,7 +451,7 @@
                     Variance
                   </div>
                   <div className={`text-3xl font-bold ${
-                    (data.metadata.total_delivered_points - data.metadata.total_planned_points) >= 0 ? 
+                    (data.metadata.total_delivered_points - data.metadata.total_planned_points) >= 0 ?
                     'text-green-600' : 'text-red-600'
                   }`}>
                     {data.metadata.total_delivered_points >= data.metadata.total_planned_points ? '+' : ''}

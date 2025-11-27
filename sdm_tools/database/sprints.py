@@ -2,10 +2,12 @@
 
 import json
 import sqlite3
+
 from rich.console import Console
-from .core import execute_sql, backup_table, create_table
+
 from .. import config
 from ..config import TABLE_NAME
+from .core import backup_table, create_table, execute_sql
 
 console = Console()
 
@@ -88,16 +90,14 @@ def extract_sprint_data_from_issues():
 
 def create_sprints_table(sprints_data, silent=False):
     """Create and populate the sprints table with unique sprint data.
-    
+
     Args:
         sprints_data: Dictionary of sprint data
         silent: If True, suppress console output
     """
     if not sprints_data:
         if not silent:
-            console.print(
-                "[bold yellow]No sprint data found to create table.[/bold yellow]"
-            )
+            console.print("[bold yellow]No sprint data found to create table.[/bold yellow]")
         return False
 
     sprint_table_name = f"{TABLE_NAME}_sprints"
@@ -174,9 +174,7 @@ def display_sprints_table():
         display_columns = [col for col in display_columns if col in columns]
 
         if not display_columns:
-            console.print(
-                "[bold red]No recognizable sprint columns found in table.[/bold red]"
-            )
+            console.print("[bold red]No recognizable sprint columns found in table.[/bold red]")
             return
 
         # Import display function from issues module
@@ -187,7 +185,7 @@ def display_sprints_table():
 
 def process_sprints_from_issues(silent=False):
     """Main function to extract and store sprint data from issues.
-    
+
     Args:
         silent: If True, suppress user prompts (for automated workflows)
     """
@@ -209,9 +207,7 @@ def process_sprints_from_issues(silent=False):
     success = create_sprints_table(sprints_data, silent=silent)
 
     if success and not silent:
-        console.print(
-            "[bold green]Sprint data processing completed successfully.[/bold green]"
-        )
+        console.print("[bold green]Sprint data processing completed successfully.[/bold green]")
 
         # Ask if user wants to display the sprints table
         display_choice = (

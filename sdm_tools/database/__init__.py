@@ -1,35 +1,35 @@
 """Database module for SDM Tools."""
 
-from .core import execute_sql, backup_table, create_table
-from .issues import store_issues_in_db, display_issues
 from .commits import (
-    update_git_commits,
+    create_git_commits_table,
     display_commits,
     store_commits_in_db,
-    create_git_commits_table,
+    update_git_commits,
 )
-from .stats import (
-    generate_daily_report_json,
-    display_daily_report_summary,
-)
-from .sprints import process_sprints_from_issues, display_sprints_table
-from .schema import create_normalized_schema, drop_all_tables, get_table_stats
+from .core import backup_table, create_table, execute_sql
+from .issues import display_issues, store_issues_in_db
 from .normalizers import normalize_all_data
 from .refresh import (
-    refresh_database_workflow,
     backup_database,
-    get_available_sprints,
     get_active_developers,
+    get_available_sprints,
+    refresh_database_workflow,
 )
 from .reports import (
+    generate_multi_sprint_report_json,
+    generate_sprint_report_json,
     query_daily_activity,
-    query_sprint_activity,
     query_date_range_activity,
     query_multi_sprint_activity,
-    generate_sprint_report_json,
-    generate_multi_sprint_report_json,
+    query_sprint_activity,
 )
-from .standalone import generate_standalone_report, generate_all_standalone_reports
+from .schema import create_normalized_schema, drop_all_tables, get_table_stats
+from .sprints import display_sprints_table, process_sprints_from_issues
+from .standalone import generate_all_standalone_reports, generate_standalone_report
+from .stats import (
+    display_daily_report_summary,
+    generate_daily_report_json,
+)
 
 __all__ = [
     "execute_sql",

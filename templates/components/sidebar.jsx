@@ -10,10 +10,10 @@ const Sidebar = ({ currentView, onNavigate, isOpen, toggle, reports }) => {
           {isOpen ? '←' : '→'}
         </button>
       </div>
-      
+
       <nav>
         {reports.map(report => (
-          <div 
+          <div
             key={report.view_name}
             className={`nav-item ${currentView === report.view_name ? 'active' : ''}`}
             onClick={() => onNavigate(report.view_name)}
@@ -23,7 +23,7 @@ const Sidebar = ({ currentView, onNavigate, isOpen, toggle, reports }) => {
           </div>
         ))}
       </nav>
-      
+
       {isOpen && (
         <div className="sidebar-footer">
           SDM Tools<br/>Bundled Reports

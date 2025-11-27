@@ -1,0 +1,106 @@
+[tool.black]
+line-length = 100
+target-version = ['py36', 'py37', 'py38', 'py39', 'py310', 'py311', 'py312', 'py313']
+include = '\.pyi?$'
+extend-exclude = '''
+/(
+  # directories
+  \.eggs
+  | \.git
+  | \.venv
+  | \.mypy_cache
+  | \.pytest_cache
+  | \.ruff_cache
+  | build
+  | dist
+  | htmlcov
+)/
+'''
+
+[tool.ruff]
+# Same line length as black for consistency
+line-length = 100
+target-version = "py37"
+
+# Exclude same directories as black
+extend-exclude = [
+    ".eggs",
+    ".git",
+    ".venv",
+    ".mypy_cache",
+    ".pytest_cache",
+    ".ruff_cache",
+    "build",
+    "dist",
+    "htmlcov",
+]
+
+[tool.ruff.lint]
+# Enable specific rule sets
+select = [
+    "E",   # pycodestyle errors
+    "W",   # pycodestyle warnings
+    "F",   # Pyflakes
+    "I",   # isort (import sorting)
+    "N",   # pep8-naming
+    "UP",  # pyupgrade (modern Python idioms)
+    "B",   # flake8-bugbear (likely bugs)
+    "C4",  # flake8-comprehensions
+    "SIM", # flake8-simplify
+]
+
+# Ignore certain rules that conflict with black or are too strict
+ignore = [
+    "E501",   # Line too long (black handles this)
+    "E722",   # Bare except (intentional for robustness in this codebase)
+    "B008",   # Do not perform function call in argument defaults
+    "B904",   # Within an except clause, raise exceptions with from err
+    "SIM105", # Use contextlib.suppress instead of try/except pass
+    "SIM108", # Use ternary operator (less readable in some cases)
+    "UP006",  # Use typing.X instead of X for annotations (Python 3.6 compat)
+    "UP007",  # Use X | Y for union types (Python 3.6 compat)
+]
+
+[tool.ruff.lint.per-file-ignores]
+# Tests can use assertions and magic values
+"tests/*" = ["S101", "PLR2004"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["sdm_tools"]
+
+[tool.mypy]
+python_version = "3.9"
+warn_return_any = false
+warn_unused_configs = true
+disallow_untyped_defs = false
+ignore_missing_imports = true
+check_untyped_defs = false
+warn_redundant_casts = true
+warn_unused_ignores = false
+no_implicit_optional = false
+strict_optional = false
+
+# Start lenient, can tighten later
+# disallow_any_generics = false
+# disallow_subclassing_any = false
+# disallow_untyped_calls = false
+# disallow_incomplete_defs = false
+
+# Exclude directories
+exclude = [
+    "^.venv/",
+    "^build/",
+    "^dist/",
+]
+
+[tool.pytest.ini_options]
+minversion = "6.0"
+addopts = "-ra -q --strict-markers"
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+
+[build-system]
+requires = ["setuptools>=45", "wheel"]
+build-backend = "setuptools.build_meta"

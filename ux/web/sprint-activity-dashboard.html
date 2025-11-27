@@ -126,7 +126,7 @@
             const devData = sprintData.sprints.map(sprint => {
               const dev = sprint.developer_summary.find(d => d.name === developerName);
               if (!dev) return null;
-              
+
               return {
                 sprintName: sprint.sprint.name.replace('DevicesTITAN_', ''),
                 jira: dev.sprint_jira,
@@ -134,13 +134,13 @@
                 total: dev.sprint_total
               };
             }).filter(Boolean);
-            
+
             // Calculate total
             const total = devData.reduce((sum, d) => sum + d[metric], 0);
-            
+
             // Build HTML
             let html = `<div class="tooltip-header">${developerName}</div>`;
-            
+
             devData.forEach(d => {
               const value = metric === 'total' ? d.total : (metric === 'jira' ? d.jira : d.git);
               const extra = metric === 'total' ? ` (J:${d.jira}, R:${d.git})` : '';
@@ -151,9 +151,9 @@
                 </div>
               `;
             });
-            
+
             html += `<div class="tooltip-total">Total: ${total} actions</div>`;
-            
+
             return html;
           };
 
@@ -176,10 +176,10 @@
                   average: avg
                 };
               });
-              
+
               // Build HTML with all sprint averages
               let html = `<div class="tooltip-header">${label}</div>`;
-              
+
               sprintAverages.forEach(s => {
                 html += `
                   <div class="tooltip-row">
@@ -188,10 +188,10 @@
                   </div>
                 `;
               });
-              
+
               const totalAvg = sprintAverages.reduce((sum, s) => sum + s.average, 0) / sprintAverages.length;
               html += `<div class="tooltip-total">Overall Avg: ${totalAvg.toFixed(1)} actions</div>`;
-              
+
               return html;
             } else {
               // For Overall Average, keep simple single value display
@@ -223,9 +223,9 @@
                     font: { size: 13, weight: '500' }
                   }
                 },
-                title: { 
-                  display: true, 
-                  text: title, 
+                title: {
+                  display: true,
+                  text: title,
                   font: { size: 20, weight: 'bold' },
                   color: '#1f2937',
                   padding: { top: 10, bottom: 15 }
@@ -235,16 +235,16 @@
                   external: (context) => {
                     const tooltipEl = tooltipRef.current;
                     const tooltipModel = context.tooltip;
-                    
+
                     if (tooltipModel.opacity === 0) {
                       tooltipEl.style.display = 'none';
                       return;
                     }
-                    
+
                     if (tooltipModel.dataPoints && tooltipModel.dataPoints.length > 0) {
                       const datasetIndex = tooltipModel.dataPoints[0].datasetIndex;
                       const dataset = data.datasets[datasetIndex];
-                      
+
                       // Check if it's an average line
                       if (dataset.isAverage) {
                         const avgValue = tooltipModel.dataPoints[0].parsed.y;
@@ -256,7 +256,7 @@
                           metricType
                         );
                       }
-                      
+
                       const position = context.chart.canvas.getBoundingClientRect();
                       tooltipEl.style.display = 'block';
                       tooltipEl.style.left = position.left + window.pageXOffset + tooltipModel.caretX + 'px';
@@ -267,12 +267,12 @@
               },
               scales: {
                 x: {
-                  title: { 
-                    display: true, 
+                  title: {
+                    display: true,
                     text: 'Sprint',
                     font: { size: 14, weight: 'bold' }
                   },
-                  ticks: { 
+                  ticks: {
                     maxRotation: 45,
                     minRotation: 45,
                     font: { size: 12 }
@@ -281,12 +281,12 @@
                 },
                 y: {
                   beginAtZero: true,
-                  title: { 
-                    display: true, 
+                  title: {
+                    display: true,
                     text: 'Actions',
                     font: { size: 14, weight: 'bold' }
                   },
-                  ticks: { 
+                  ticks: {
                     color: '#6b7280',
                     font: { size: 12 }
                   },
@@ -296,7 +296,7 @@
               onHover: (event, activeElements, chart) => {
                 if (activeElements.length > 0) {
                   const datasetIndex = activeElements[0].datasetIndex;
-                  
+
                   chart.data.datasets.forEach((dataset, idx) => {
                     if (idx === datasetIndex) {
                       // Hovered line: moderately thicker and solid
@@ -310,7 +310,7 @@
                       dataset.borderDash = dataset.defaultBorderDash || [];
                     }
                   });
-                  
+
                   chart.update('none');
                 } else {
                   // Reset all to default when not hovering
@@ -342,28 +342,28 @@
 
         const getActivityColor = (total) => {
           // Using transparent blues, greens, and yellows only - greens and blues less transparent
-          if (total === 0) return { 
-            className: 'text-gray-400', 
-            style: { backgroundColor: 'rgba(249, 250, 251, 0.5)' } 
+          if (total === 0) return {
+            className: 'text-gray-400',
+            style: { backgroundColor: 'rgba(249, 250, 251, 0.5)' }
           };
-          if (total >= 50) return { 
-            className: 'text-gray-900', 
+          if (total >= 50) return {
+            className: 'text-gray-900',
             style: { backgroundColor: 'rgba(134, 239, 172, 0.6)' }  // Green (top) - less transparent
           };
-          if (total >= 30) return { 
-            className: 'text-gray-900', 
+          if (total >= 30) return {
+            className: 'text-gray-900',
             style: { backgroundColor: 'rgba(187, 247, 208, 0.55)' }  // Green (upper) - less transparent
           };
-          if (total >= 15) return { 
-            className: 'text-gray-900', 
+          if (total >= 15) return {
+            className: 'text-gray-900',
             style: { backgroundColor: 'rgba(254, 249, 195, 0.5)' }  // Yellow (middle) - unchanged
           };
-          if (total >= 5) return { 
-            className: 'text-gray-900', 
+          if (total >= 5) return {
+            className: 'text-gray-900',
             style: { backgroundColor: 'rgba(191, 219, 254, 0.6)' }  // Blue (lower) - less transparent
           };
-          return { 
-            className: 'text-gray-700', 
+          return {
+            className: 'text-gray-700',
             style: { backgroundColor: 'rgba(219, 234, 254, 0.5)' }  // Blue (bottom) - less transparent
           };
         };
@@ -403,8 +403,8 @@
                         const sprintData = dev.sprintData[sprint.id] || { total: 0, jira: 0, git: 0 };
                         const colorData = getActivityColor(sprintData.total);
                         return (
-                          <td 
-                            key={sprint.id} 
+                          <td
+                            key={sprint.id}
                             className={`px-2 py-2 text-center ${colorData.className}`}
                             style={colorData.style}
                           >
@@ -461,25 +461,25 @@
           // Reverse sprints so oldest is first (left), newest is last (right)
           const reversedSprints = [...report.sprints].reverse();
           const sprintLabels = reversedSprints.map(s => s.sprint.name.replace('DevicesTITAN_', ''));
-          
+
           const developerEmails = [
             ...new Set(
-              reversedSprints.flatMap(s => 
+              reversedSprints.flatMap(s =>
                 s.developer_summary.map(d => d.email)
               )
             )
           ];
-          
+
           // Create dataset for each developer (dashed lines)
           const datasets = developerEmails.map((email, idx) => {
             const devName = reversedSprints
               .flatMap(s => s.developer_summary)
               .find(d => d.email === email)?.name || email;
-            
+
             const data = reversedSprints.map(sprint => {
               const dev = sprint.developer_summary.find(d => d.email === email);
               if (!dev) return 0;
-              
+
               switch(metricType) {
                 case 'jira': return dev.sprint_jira;
                 case 'git': return dev.sprint_git;
@@ -487,7 +487,7 @@
                 default: return 0;
               }
             });
-            
+
             return {
               label: devName,
               data: data,
@@ -503,7 +503,7 @@
               isAverage: false
             };
           });
-          
+
           // Calculate sprint averages (average per sprint across all developers)
           const sprintAverages = reversedSprints.map(sprint => {
             const values = sprint.developer_summary.map(dev => {
@@ -516,9 +516,9 @@
             });
             return values.reduce((sum, v) => sum + v, 0) / values.length;
           });
-          
+
           // Calculate overall average (average across all sprints and developers)
-          const allValues = reversedSprints.flatMap(sprint => 
+          const allValues = reversedSprints.flatMap(sprint =>
             sprint.developer_summary.map(dev => {
               switch(metricType) {
                 case 'jira': return dev.sprint_jira;
@@ -530,7 +530,7 @@
           );
           const overallAverage = allValues.reduce((sum, v) => sum + v, 0) / allValues.length;
           const overallAverages = new Array(reversedSprints.length).fill(overallAverage);
-          
+
           // Add sprint average line (red, dashed)
           datasets.push({
             label: 'Sprint Average',
@@ -546,7 +546,7 @@
             pointBackgroundColor: SPRINT_AVG_COLOR,
             isAverage: true
           });
-          
+
           // Add overall average line (black, dashed)
           datasets.push({
             label: 'Overall Average',
@@ -562,7 +562,7 @@
             pointBackgroundColor: OVERALL_AVG_COLOR,
             isAverage: true
           });
-          
+
           return {
             labels: sprintLabels,
             datasets: datasets
@@ -572,7 +572,7 @@
         // Prepare sprint activity table data
         const prepareSprintTableData = (report) => {
           const developerMap = {};
-          
+
           report.sprints.forEach(sprint => {
             sprint.developer_summary.forEach(dev => {
               if (!developerMap[dev.email]) {
@@ -585,19 +585,19 @@
                   totalGit: 0
                 };
               }
-              
+
               developerMap[dev.email].sprintData[sprint.sprint.id] = {
                 total: dev.sprint_total,
                 jira: dev.sprint_jira,
                 git: dev.sprint_git
               };
-              
+
               developerMap[dev.email].total += dev.sprint_total;
               developerMap[dev.email].totalJira += dev.sprint_jira;
               developerMap[dev.email].totalGit += dev.sprint_git;
             });
           });
-          
+
           return {
             developers: Object.values(developerMap).sort((a, b) => b.total - a.total),
             sprints: report.sprints.map(s => ({
@@ -612,18 +612,18 @@
             .then((res) => res.json())
             .then((reportData) => {
               setData(reportData);
-              
+
               // Prepare chart data
               const jiraData = prepareLineChartData(reportData, 'jira');
               const gitData = prepareLineChartData(reportData, 'git');
               const totalData = prepareLineChartData(reportData, 'total');
-              
+
               setChartData({ jiraData, gitData, totalData });
-              
+
               // Prepare table data
               const sprintTable = prepareSprintTableData(reportData);
               setTableData(sprintTable);
-              
+
               setLoading(false);
             })
             .catch((err) => {
@@ -657,7 +657,7 @@
                   Sprint Activity Dashboard
                 </h1>
                 <p className="text-xl opacity-90">
-                  Last {data.metadata.sprint_count} Sprint{data.metadata.sprint_count !== 1 ? 's' : ''} 
+                  Last {data.metadata.sprint_count} Sprint{data.metadata.sprint_count !== 1 ? 's' : ''}
                   {' '}({data.metadata.earliest_sprint.start_date} to {data.metadata.latest_sprint.start_date})
                 </p>
                 <p className="text-sm mt-2 opacity-75">

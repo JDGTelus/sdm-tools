@@ -2,7 +2,8 @@
 
 import requests
 from requests.auth import HTTPBasicAuth
-from .config import JIRA_URL, JIRA_API_TOKEN, JIRA_EMAIL, JQL_QUERY
+
+from .config import JIRA_API_TOKEN, JIRA_EMAIL, JIRA_URL, JQL_QUERY
 
 
 def fetch_issue_ids():
@@ -29,9 +30,7 @@ def fetch_issue_ids():
             json=request_body,
         )
         if response.status_code != 200:
-            raise Exception(
-                f"Failed to fetch issue IDs: {response.status_code} - {response.text}"
-            )
+            raise Exception(f"Failed to fetch issue IDs: {response.status_code} - {response.text}")
         response_data = response.json()
         issues = response_data.get("issues", [])
         all_issue_ids.extend([issue["id"] for issue in issues])

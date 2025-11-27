@@ -1,13 +1,15 @@
 """Issues database functionality."""
 
 import os
-import subprocess
 import sqlite3
+import subprocess
+
 from rich.console import Console
 from rich.table import Table
-from .core import execute_sql, backup_table, create_table
+
 from .. import config
-from ..config import TABLE_NAME, DISPLAY_COLUMNS
+from ..config import DISPLAY_COLUMNS, TABLE_NAME
+from .core import backup_table, create_table, execute_sql
 
 console = Console()
 
@@ -20,15 +22,11 @@ def store_issues_in_db(issues):
             f"SELECT name FROM sqlite_master WHERE type='table' AND name='{TABLE_NAME}'",
         ).fetchone():
             backup_table(conn, TABLE_NAME)
-        all_fields = {
-            k for issue in issues for k, v in issue["fields"].items() if v is not None
-        }
+        all_fields = {k for issue in issues for k, v in issue["fields"].items() if v is not None}
         create_table(conn, TABLE_NAME, all_fields)
         for issue in issues:
             fields = {k: v for k, v in issue["fields"].items() if v is not None}
-            values = [issue["id"]] + [
-                str(fields.get(field, "")) for field in fields.keys()
-            ]
+            values = [issue["id"]] + [str(fields.get(field, "")) for field in fields]
             execute_sql(
                 conn,
                 f"""
@@ -64,9 +62,7 @@ def display_issues():
     with sqlite3.connect(config.DB_NAME) as conn:
         cursor = conn.cursor()
         # Check if the table exists
-        cursor.execute(
-            f"SELECT name FROM sqlite_master WHERE type='table' AND name='{TABLE_NAME}'"
-        )
+        cursor.execute(f"SELECT name FROM sqlite_master WHERE type='table' AND name='{TABLE_NAME}'")
         if not cursor.fetchone():
             console.print(
                 "[bold red]No issues data found in the database. Please run option 1 to update issues from Jira first.[/bold red]"
@@ -90,9 +86,7 @@ def display_issues():
 def fetch_earliest_ticket_date():
     """Fetches the creation date of the earliest Jira ticket from the database."""
     with sqlite3.connect(config.DB_NAME) as conn:
-        earliest_date = execute_sql(
-            conn, f"SELECT MIN(created) FROM {TABLE_NAME}"
-        ).fetchone()[0]
+        earliest_date = execute_sql(conn, f"SELECT MIN(created) FROM {TABLE_NAME}").fetchone()[0]
     if earliest_date:
         from datetime import datetime
 

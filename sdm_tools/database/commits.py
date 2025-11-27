@@ -2,11 +2,13 @@
 
 import os
 import sqlite3
+
 from rich.console import Console
-from .core import execute_sql, backup_table
-from .issues import display_table_data, fetch_earliest_ticket_date
+
 from .. import config
 from ..repo import fetch_git_commits_since
+from .core import backup_table, execute_sql
+from .issues import display_table_data, fetch_earliest_ticket_date
 
 console = Console()
 
@@ -24,9 +26,7 @@ def update_git_commits():
         # Check if the issues table exists
         from ..config import TABLE_NAME
 
-        cursor.execute(
-            f"SELECT name FROM sqlite_master WHERE type='table' AND name='{TABLE_NAME}'"
-        )
+        cursor.execute(f"SELECT name FROM sqlite_master WHERE type='table' AND name='{TABLE_NAME}'")
         if not cursor.fetchone():
             console.print(
                 "[bold red]No Jira issues found in the database. Please run option 1 to update issues from Jira first.[/bold red]"
@@ -39,14 +39,10 @@ def update_git_commits():
         console.print("[bold red]No Jira issues found in the database.[/bold red]")
         input("Press Enter to return to the menu...")
         return
-    console.print(
-        f"[bold green]Earliest Jira ticket creation date: {earliest_date}[/bold green]"
-    )
+    console.print(f"[bold green]Earliest Jira ticket creation date: {earliest_date}[/bold green]")
     commits = fetch_git_commits_since(earliest_date)
     if not commits:
-        console.print(
-            "[bold red]No commits found since the earliest Jira ticket date.[/bold red]"
-        )
+        console.print("[bold red]No commits found since the earliest Jira ticket date.[/bold red]")
         input("Press Enter to return to the menu...")
         return
     store_commits_in_db(commits)
@@ -64,9 +60,7 @@ def store_commits_in_db(commits):
         for commit in commits:
             if commit.strip():
                 try:
-                    hash, author_name, author_email, date, message = commit.split(
-                        "|", 4
-                    )
+                    hash, author_name, author_email, date, message = commit.split("|", 4)
                     execute_sql(
                         conn,
                         """
@@ -76,9 +70,7 @@ def store_commits_in_db(commits):
                         (hash, author_name, author_email, date, message),
                     )
                 except ValueError:
-                    console.print(
-                        f"[bold red]Error processing commit: {commit}[/bold red]"
-                    )
+                    console.print(f"[bold red]Error processing commit: {commit}[/bold red]")
 
 
 def create_git_commits_table(conn):
@@ -100,18 +92,14 @@ def create_git_commits_table(conn):
 def display_commits():
     """Displays commit information from the git_commits table."""
     if not os.path.exists(config.DB_NAME):
-        console.print(
-            "[bold red]Database does not exist. Please update commits first.[/bold red]"
-        )
+        console.print("[bold red]Database does not exist. Please update commits first.[/bold red]")
         input("Press Enter to return to the menu...")
         return
 
     with sqlite3.connect(config.DB_NAME) as conn:
         cursor = conn.cursor()
         # Check if the table exists
-        cursor.execute(
-            "SELECT name FROM sqlite_master WHERE type='table' AND name='git_commits'"
-        )
+        cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='git_commits'")
         if not cursor.fetchone():
             console.print(
                 "[bold red]No commit data found in the database. Please update commits first.[/bold red]"

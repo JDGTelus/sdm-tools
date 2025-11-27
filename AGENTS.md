@@ -30,7 +30,7 @@
 
 ### Imports
 - **Order**: Standard library first, third-party second, local imports last
-- **Style**: 
+- **Style**:
   - From-imports for specific functions/classes: `from .config import DB_NAME`
   - Import modules for external packages: `import requests`, `import sqlite3`
 - **Dynamic imports**: Use `from .. import config` instead of `from ..config import DB_NAME` when values may change at runtime

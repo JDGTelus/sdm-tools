@@ -115,7 +115,7 @@ Coverage Summary (13% overall):
   schema.py              - 78%  ✅
   developer_normalizer.py- 55%  ✅
   utils.py               - 54%  ✅
-  
+
   (CLI, API clients, and HTML generation intentionally excluded from unit tests)
 ```
 
@@ -160,10 +160,10 @@ def test_aws_sso_prefix_removal(self):
 def test_8am_to_10am_bucket(self):
     dt = datetime(2025, 1, 1, 8, 0, 0, tzinfo=ZoneInfo('UTC'))
     assert get_time_bucket(dt) == '8am-10am'
-    
+
     dt = datetime(2025, 1, 1, 9, 59, 59, tzinfo=ZoneInfo('UTC'))
     assert get_time_bucket(dt) == '8am-10am'
-    
+
     # Boundary: 10:00 should NOT be in this bucket
     dt = datetime(2025, 1, 1, 10, 0, 0, tzinfo=ZoneInfo('UTC'))
     assert get_time_bucket(dt) != '8am-10am'

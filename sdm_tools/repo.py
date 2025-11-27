@@ -1,10 +1,11 @@
 """Git repo handler"""
 
-import subprocess
 import os
-from rich.console import Console
-from .config import REPO_PATH
+import subprocess
 
+from rich.console import Console
+
+from .config import REPO_PATH
 
 console = Console()
 
